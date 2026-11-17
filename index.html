@@ -683,9 +683,12 @@ function formRows(k){
       if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
       man.filter(o=>o.mtype!=='cover').forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
       const st=r.spans[0]?r.spans[0][0]:null;
-      if(st){c.C=T4(st);c.D=T4(r.spans[0][1]);}
+      /* Working day = 9 jam wajib: duty mula hingga 1 jam sebelum habis (jam terakhir = excess). Cth A1 0400-1300, excess 1300-1400 */
+      if(st){c.C=T4(st);c.D=T4(new Date(+r.spans[0][1]-3600000));}
       if(r.holiday)c.G=1;else c.E=1;
-      if(r.ot.length){c.H=r.ot.map(o=>T4(o.st)).join('\n');c.I=r.ot.map(o=>T4(o.en)).join('\n');if(r.holiday)c.L=+fh(r.otTot);else c.J=+fh(r.otTot);}
+      /* Ops Req balik lewat / Ex Sign Off yang bersambung dengan masa sebelumnya digabung satu baris (format DWR: 2230-2430) */
+      const segs=[];r.ot.forEach(o=>{const pv=segs[segs.length-1];if(pv&&+pv.en===+o.st&&(o.mtype==='signoff'||(o.mtype==='ops'&&/lewat/.test(o.kind))))pv.en=o.en;else segs.push({st:o.st,en:o.en});});
+      if(r.ot.length){c.H=segs.map(o=>T4(o.st)).join('\n');c.I=segs.map(o=>T4(o.en)).join('\n');if(r.holiday)c.L=+fh(r.otTot);else c.J=+fh(r.otTot);}
     }else if(r.off&&r.offOT){
       lines.push(`${r.raw}/OT ${r.offOT}`);
       man.forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
