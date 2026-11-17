@@ -191,7 +191,7 @@ function dayCalc(k,d){
   const ot=[];
   if(jamWin)ot.push({kind:'1 jam shift',st:jamWin[0],en:jamWin[1],h:jamH,note:p.shifts[0]+(swapped?' (tukar)':'')});
   dsWins.forEach(w=>ot.push({kind:'Double shift',st:w[0],en:w[1],pre:w[2],h:(w[1]-w[0])/3600000,note:p.shifts.join(' + ')}));
-  man.forEach(m=>ot.push({kind:MAN_KIND[m.type]||'OT tambahan',mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
+  man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:MAN_KIND[m.type]||'OT tambahan',mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
   { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover')continue; if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0&&!ot[i].full) ot.splice(i,1);
@@ -270,7 +270,7 @@ function render(){
   const up=upcoming();
   if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtTime(x.st)}–${fmtTime(x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
   const ad=activeDay();
-  if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button><button class="btn" data-quick="cover">+ OT Cover Meal Break</button><button class="btn" data-quick="ot">+ OT</button></span></div>`;
+  if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button>${ad.r.shifts.length>1?'':'<button class="btn" data-quick="cover">+ OT Cover Meal Break</button>'}<button class="btn" data-quick="ot">+ OT</button></span></div>`;
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
   if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni. Isi roster di tab Tetapan.</div>`; h+=renderCal(y,m); }
   else if(view==='claim') h+= S.months[cur] ? renderClaim() : `<div class="card">Belum ada roster untuk bulan ni.</div>`;
@@ -469,6 +469,7 @@ function openDay(d){
     if(ctoTouched){ delete S.cto[cur][d]; const want=md.querySelector('#dcto').checked; if(want!==dayCalc(cur,d).ctoDefault) S.cto[cur][d]=want?1:0; }
     const hk=dkey(y,m,d),hv=md.querySelector('#dh').value.trim();if(hv)S.holidays[hk]=hv;else delete S.holidays[hk];
     const os=md.querySelector('#otS').value,oe=md.querySelector('#otE').value;
+    if(os&&oe&&md.querySelector('#otT').value==='cover'&&v.length>1){toast('Hari double shift tak boleh claim OT Cover Meal Break');return}
     if(os&&oe){(S.otManual[ck]=S.otManual[ck]||[]).push({start:os,end:oe,note:md.querySelector('#otN').value.trim(),type:md.querySelector('#otT').value});}
     else if(os||oe){toast('Isi masa mula dan tamat OT');return}
     const et=md.querySelector('#evt').value.trim();if(et)S.events.push({date:hk,title:et,venue:md.querySelector('#evv').value.trim()||'Bukit Jalil',time:md.querySelector('#evh').value});
