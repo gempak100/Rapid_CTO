@@ -169,13 +169,23 @@ function dayCalc(k,d){
   const CH=S.claimHour;let jamH=0,jamWin=null;
   const swapped=(S.changes[dkey(y,mo,d)]||{}).type==='swap';
   if(CH.on&&p.shifts.length&&spans[0]&&(CH.swap||!swapped)){jamH=+CH.jam||0;const en=spans[0][1];jamWin=[new Date(en.getTime()-jamH*3600000),en];}
-  let dsWin=null;
-  if(otH>0){const s0=spans[0];const rest=spans.slice(1);const st=new Date(Math.max(s0[1],Math.min(...rest.map(x=>+x[0]))));const en=new Date(Math.max(...spans.map(x=>+x[1])));dsWin=[st,en];otH=(en-st)/3600000;}
+  // Double shift: masa duty OT yang tidak bertindih dengan duty asal (sebelum atau selepas duty asal)
+  let dsWins=[];
+  if(p.shifts.length>1&&spans.length===p.shifts.length){
+    const o=spans[0];const parts=[];
+    for(const sp of spans.slice(1)){
+      if(sp[0]<o[0])parts.push([sp[0],new Date(Math.min(+sp[1],+o[0]))]);
+      if(sp[1]>o[1])parts.push([new Date(Math.max(+sp[0],+o[1])),sp[1]]);
+    }
+    parts.sort((a,b)=>a[0]-b[0]);
+    for(const pt of parts){const last=dsWins[dsWins.length-1];if(last&&pt[0]<=last[1]){if(pt[1]>last[1])last[1]=pt[1];}else dsWins.push([pt[0],pt[1]]);}
+    otH=dsWins.reduce((a,w)=>a+(w[1]-w[0])/3600000,0);
+  }
   const man=(S.otManual[dkey(y,mo,d)]||[]).map((e,i)=>{const st=new Date(y,mo-1,d,...e.start.split(':').map(Number));let en=new Date(y,mo-1,d,...e.end.split(':').map(Number));if(en<=st)en=new Date(+en+86400000);return {i,st,en,h:(en-st)/3600000,note:e.note||''}});
   let manH=man.reduce((a,b)=>a+b.h,0);
   const ot=[];
   if(jamWin)ot.push({kind:'1 jam shift',st:jamWin[0],en:jamWin[1],h:jamH,note:p.shifts[0]+(swapped?' (tukar)':'')});
-  if(dsWin)ot.push({kind:'Double shift',st:dsWin[0],en:dsWin[1],h:otH,note:p.shifts.join(' + ')});
+  dsWins.forEach(w=>ot.push({kind:'Double shift',st:w[0],en:w[1],h:(w[1]-w[0])/3600000,note:p.shifts.join(' + ')}));
   man.forEach(m=>ot.push({kind:'OT tambahan',st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   // Had sehari: OT maksimum 9 jam (potong dari hujung) + 1 jam excess duty asal
   { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift')continue; if(o.h>left){o.h=Math.max(0,left);o.en=new Date(+o.st+o.h*3600000);} left-=o.h; }
