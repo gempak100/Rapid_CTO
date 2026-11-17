@@ -219,7 +219,10 @@ function monthCalc(k){
   return {rows,T};
 }
 function fh(h){return (Math.round(h*100)/100).toString()}
-function fmtTime(dt){return pad(dt.getHours())+pad(dt.getMinutes())}
+/* jam 24: lepas tengah malam diteruskan dari hari rujukan (0000 -> 2400, 0100 -> 2500) */
+function fmtTime(dt,ref){if(!ref)return pad(dt.getHours())+pad(dt.getMinutes());const b=new Date(ref.getFullYear(),ref.getMonth(),ref.getDate());const mins=Math.round((dt-b)/60000);return pad(Math.floor(mins/60))+pad(mins%60)}
+function fmtSpan(st,en,ref,sep){ref=ref||st;return fmtTime(st,ref)+(sep||'–')+fmtTime(en,ref)}
+function tSpan(t){const a=t[0].replace(':',''),b=t[1].replace(':','');return a+'–'+(b<=a?String(+b.slice(0,2)+24)+b.slice(2):b)}
 function spanText(r){return r.spans.map(s=>hhmm(s[0],r.y,r.mo,r.d)+'–'+hhmm(s[1],r.y,r.mo,r.d)).join(', ')}
 
 // ---- next shift ----
@@ -293,7 +296,7 @@ function render(){
   let h=`<div class="top"><div><h1>Jadual Kerja & Claim</h1><div class="sub">${esc(S.name)} · No. ${esc(S.staffNo)}</div></div>
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
-  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtTime(x.st)}–${fmtTime(x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
+  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
   const ad=activeDay();
   if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button>${ad.r.shifts.length>1?'':'<button class="btn" data-quick="cover">+ OT Cover Meal Break</button>'}<button class="btn" data-quick="ops">+ Ops Req</button><button class="btn" data-quick="ot">+ OT</button></span></div>`;
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
@@ -337,7 +340,7 @@ function renderCal(y,m){
   const up=upcoming().filter(x=>`${x.st.getFullYear()}-${x.st.getMonth()+1}`===cur||x.r.y+'-'+x.r.mo===cur);
   if(up.length){
     g+=`<div class="card"><b>Tambah ke Google Calendar</b><p class="note">Setiap pautan buka Google Calendar dengan shift tu dah terisi. Peringatan ikut tetapan notification default Google Calendar kau.</p><div class="list">`;
-    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${x.code}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtTime(x.st)}–${fmtTime(x.en)}</span><a href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
+    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${x.code}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
     g+=`</div></div>`;
   }
   return g;
@@ -464,10 +467,10 @@ function openDay(d){
   <div id="chNote" style="margin-top:8px;display:${ch&&ch.type!=='none'?'block':'none'}"><input id="chN" placeholder="Catatan (sebab / no. rujukan)" value="${esc(ch&&ch.note||'')}" style="width:100%"></div></div>
   <label class="row" style="margin-top:10px"><input type="checkbox" id="dcto" ${r.ctoFlag?'checked':''}> Tuntut CTO hari ni</label>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:${r.shifts.length?'block':'none'}"><b style="font-size:13px">☎ OT dipanggil supervisor</b>
-  <div class="row" style="margin-top:6px"><select id="odSel"><option value="">Tiada</option>${Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b):isPagi(a)?-1:1)).map(c=>`<option value="${esc(c)}" ${S.otDuty[ck]===c?'selected':''}>${esc(c)} (${S.times[c][0].replace(':','')}–${S.times[c][1].replace(':','')})</option>`).join('')}</select>
+  <div class="row" style="margin-top:6px"><select id="odSel"><option value="">Tiada</option>${Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b):isPagi(a)?-1:1)).map(c=>`<option value="${esc(c)}" ${S.otDuty[ck]===c?'selected':''}>${esc(c)} (${tSpan(S.times[c])})</option>`).join('')}</select>
   <span class="note">${(S.months[cur]||{})[d]&&parseDay((S.months[cur]||{})[d]).shifts.length>1?'Hari ni dah double shift dalam roster.':'Pilih duty OT yang supervisor minta.'}</span></div></div>
-  <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">OT tambahan / Meal break</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind} ${fmtTime(o.st)}–${fmtTime(o.en)} (${fh(o.h)} jam)</div>`).join('')}
-  ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtTime(o.st)}–${fmtTime(o.en)} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
+  <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">OT tambahan / Meal break</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
+  ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
   <div class="row" style="margin-top:6px"><select id="otT"><option value="ot">OT tambahan</option><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option></select><input id="otS" type="time" style="width:110px"><span>–</span><input id="otE" type="time" style="width:110px"><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
   <div class="row"><b style="font-size:13px">Cuti umum</b><input id="dh" placeholder="Kosong kalau bukan cuti" value="${esc(hol(y,m,d)||'')}" style="flex:1"></div>
@@ -526,7 +529,7 @@ async function dl(ext){
     const aoa=[[c.title],[`Nama: ${S.name}`,'','',`No. Pekerja: ${S.staffNo}`],[],c.head,...c.body,c.tot];
     const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:12},{wch:9},{wch:14},{wch:30},{wch:22},{wch:14},{wch:15},{wch:13},{wch:9},{wch:12},{wch:12}];
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Claim');
-    const OL=otList(cur);const ws2=XLSX.utils.aoa_to_sheet([[`Rekod Jam OT ${c.title.replace('Claim Elaun ','')}`],[`Nama: ${S.name}`,'','',`No. Pekerja: ${S.staffNo}`],[],['Tarikh','Hari','Jenis','Mula','Tamat','Jam','Catatan','Status'],...OL.map(o=>[`${pad(o.r.d)}/${pad(o.r.mo)}/${o.r.y}`,HARI[new Date(o.r.y,o.r.mo-1,o.r.d).getDay()],o.kind,fmtTime(o.st),fmtTime(o.en),+fh(o.h),o.note,o.done?'Dah buat':'Akan datang']),['JUMLAH','','','','',+fh(OL.reduce((a,b)=>a+b.h,0)),'','']]);
+    const OL=otList(cur);const ws2=XLSX.utils.aoa_to_sheet([[`Rekod Jam OT ${c.title.replace('Claim Elaun ','')}`],[`Nama: ${S.name}`,'','',`No. Pekerja: ${S.staffNo}`],[],['Tarikh','Hari','Jenis','Mula','Tamat','Jam','Catatan','Status'],...OL.map(o=>[`${pad(o.r.d)}/${pad(o.r.mo)}/${o.r.y}`,HARI[new Date(o.r.y,o.r.mo-1,o.r.d).getDay()],o.kind,fmtTime(o.st,new Date(o.r.y,o.r.mo-1,o.r.d)),fmtTime(o.en,new Date(o.r.y,o.r.mo-1,o.r.d)),+fh(o.h),o.note,o.done?'Dah buat':'Akan datang']),['JUMLAH','','','','',+fh(OL.reduce((a,b)=>a+b.h,0)),'','']]);
     ws2['!cols']=[{wch:12},{wch:9},{wch:13},{wch:7},{wch:7},{wch:6},{wch:18},{wch:12}];XLSX.utils.book_append_sheet(wb,ws2,'Rekod OT');
     data=new Uint8Array(XLSX.write(wb,{bookType:'xlsx',type:'array'}));
   }else{
@@ -759,7 +762,7 @@ root.addEventListener('click',e=>{
   else if(t.id==='rsOut'){if(confirm('Tukar pengguna? Simpan backup dulu kalau perlu. Data dalam phone ni akan dikosongkan.')){try{localStorage.removeItem(LS_KEY)}catch(e){};const keep={holidays:S.holidays,events:S.events};S=JSON.parse(JSON.stringify(BASE));Object.assign(S,keep);view='login';render();}}
   else if(t.id==='bkSave')saveBackup();
   else if(t.id==='dlics')dlIcs();
-  else if(t.id==='cpyot'){const L=otList(cur);const [yy,mm]=cur.split('-').map(Number);const txt=`Rekod OT ${BULAN[mm-1]} ${yy}\n${S.name} (${S.staffNo})\n`+L.map(o=>`${o.r.d}/${o.r.mo} ${o.kind} ${fmtTime(o.st)}-${fmtTime(o.en)} = ${fh(o.h)} jam${o.done?'':' (akan datang)'}`).join('\n')+`\nJumlah: ${fh(L.reduce((a,b)=>a+b.h,0))} jam`;navigator.clipboard.writeText(txt).then(()=>toast('Rekod OT disalin')).catch(()=>toast('Tak dapat salin'))}
+  else if(t.id==='cpyot'){const L=otList(cur);const [yy,mm]=cur.split('-').map(Number);const txt=`Rekod OT ${BULAN[mm-1]} ${yy}\n${S.name} (${S.staffNo})\n`+L.map(o=>`${o.r.d}/${o.r.mo} ${o.kind} ${fmtSpan(o.st,o.en,new Date(o.r.y,o.r.mo-1,o.r.d),'-')} = ${fh(o.h)} jam${o.done?'':' (akan datang)'}`).join('\n')+`\nJumlah: ${fh(L.reduce((a,b)=>a+b.h,0))} jam`;navigator.clipboard.writeText(txt).then(()=>toast('Rekod OT disalin')).catch(()=>toast('Tak dapat salin'))}
   else if(t.id==='saveSet'){
     root.querySelectorAll('[data-rate]').forEach(i=>S.rates[i.dataset.rate]=parseFloat(i.value)||0);
     root.querySelectorAll('[data-time]').forEach(i=>{const c=i.dataset.time;S.times[c]=S.times[c]||['',''];S.times[c][+i.dataset.i]=i.value});
