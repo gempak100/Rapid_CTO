@@ -208,7 +208,17 @@ function rel(dt){const ms=dt-new Date();if(ms<=0)return 'sedang berjalan';const 
 
 // ---- render ----
 const root=document.createElement('div');root.id='root';document.body.appendChild(root);
+function renderLogin(){
+  root.innerHTML=`<div class="top"><div><h1>Jadual Kerja & Claim</h1><div class="sub">Masuk untuk muat jadual kerja kau</div></div></div>
+  <div class="card" style="max-width:420px;margin:30px auto">
+  <b>Masuk</b><p class="note">Masukkan kata laluan pasukan (dari group kerja) dan no. pekerja kau. Jadual kerja kau akan dimuat dari roster.</p>
+  <label>Kata laluan pasukan<br><input id="lgPw" autocomplete="off" autocapitalize="characters" value="${esc(teamPw())}" style="width:100%;margin-top:4px" placeholder="XXXX-XXXX-XXXX"></label>
+  <label style="display:block;margin-top:10px">No. pekerja (ID)<br><input id="lgId" inputmode="numeric" value="${esc(S.staffNo||'')}" style="width:100%;margin-top:4px" placeholder="cth 16497"></label>
+  <div class="row" style="margin-top:14px"><button class="btn primary" id="lgGo">Masuk</button><span id="lgMsg" class="note"></span></div>
+  <p class="note" style="margin-top:14px">Dah ada fail backup? <label style="text-decoration:underline;cursor:pointer">Buka backup<input type="file" id="bkLoad" accept=".json,application/json" style="display:none"></label></p></div>`;
+}
 function render(){
+  if(view==='login'){renderLogin();return}
   const [y,m]=cur.split('-').map(Number);
   let h=`<div class="top"><div><h1>Jadual Kerja & Claim</h1><div class="sub">${esc(S.name)} · No. ${esc(S.staffNo)}</div></div>
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
@@ -326,7 +336,9 @@ function renderCuti(){
 }
 function renderSettings(){
   const codes=[...new Set(['A1','A2','A3','B1','B2','B3',...Object.keys(S.times),...Object.values(S.months).flatMap(mo=>Object.values(mo).flatMap(s=>parseDay(s).shifts))])].sort();
-  let h=`<div class="card"><b>Isi roster sebulan</b><p class="note">Pilih bulan, kemudian tulis kod shift dari hari 1 hingga akhir bulan, <b>asingkan dengan koma</b>. Double shift guna "/" (cth A2/B2). Hari kosong tulis "-".<br>Contoh: <code>-, B3, B3, OFF, REST, A2, A2, A3/B1, B PTH STBY</code><br>Atau hantar gambar roster pada Claude dan minta "senarai kod untuk apps", kemudian tampal di sini.</p>
+  let h=`<div class="card"><b>Akaun roster</b><p class="note">${S.staffNo?`Masuk sebagai <b>${esc(S.name)}</b> (No. ${esc(S.staffNo)}). Roster dikemas kini sendiri bila apps dibuka dengan internet. Perubahan kau (tukar shift, cuti, OT) tak akan ditimpa.`:'Belum masuk.'}</p>
+  <div class="row"><button class="btn primary" id="rsSync">Kemas kini roster sekarang</button><button class="btn" id="rsOut">Tukar pengguna</button></div></div>`;
+  h+=`<div class="card"><b>Isi roster sebulan (manual)</b><p class="note">Pilih bulan, kemudian tulis kod shift dari hari 1 hingga akhir bulan, <b>asingkan dengan koma</b>. Double shift guna "/" (cth A2/B2). Hari kosong tulis "-".<br>Contoh: <code>-, B3, B3, OFF, REST, A2, A2, A3/B1, B PTH STBY</code><br>Atau hantar gambar roster pada Claude dan minta "senarai kod untuk apps", kemudian tampal di sini.</p>
   <div class="row"><input type="month" id="rMonth" value="${(()=>{const [yy,mm]=cur.split('-').map(Number);return yy+'-'+pad(mm)})()}"></div>
   <textarea id="rCodes" rows="3" style="width:100%;margin-top:8px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)" placeholder="B3, B3, OFF, REST, A2, ..."></textarea>
   <div class="row" style="margin-top:8px"><button class="btn primary" id="fillRoster">Masukkan roster</button><span id="rosterMsg" class="note"></span></div></div>`;
@@ -545,6 +557,54 @@ async function dlForm(){
 }
 
 // ---- roster reading via Claude ----
+// ---- roster berkunci (roster/<bulan>.enc.json) ----
+const PW_KEY='jadual_kerja_team_pw';
+function teamPw(){try{return localStorage.getItem(PW_KEY)||''}catch(e){return ''}}
+function setTeamPw(v){try{localStorage.setItem(PW_KEY,v)}catch(e){}}
+const ub=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+async function decryptRoster(enc,pw){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:ub(enc.salt),iterations:enc.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(enc.iv)},key,ub(enc.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function syncRoster(pw,id,opts={}){
+  id=String(id).trim().replace(/^0+/,'');pw=String(pw).trim().toUpperCase();
+  const idx=await (await fetch('roster/index.json',{cache:'no-store'})).json();
+  let found=0,added=[];
+  for(const mk of idx.months){
+    const enc=await (await fetch(`roster/${mk}.enc.json`,{cache:'no-store'})).json();
+    let data;try{data=await decryptRoster(enc,pw)}catch(e){throw new Error('pw')}
+    const me=data.staff.find(x=>String(x.id).replace(/^0+/,'')===id);
+    if(!me)continue;found++;
+    const [yy,mm]=mk.split('-').map(Number);const k=`${yy}-${mm}`;
+    const had=!!S.months[k];const mo=S.months[k]||{};const out={};
+    for(let d=1;d<=monthDays(k);d++){
+      const ch=S.changes[dkey(yy,mm,d)];
+      if(ch&&mo[d]) out[d]=mo[d];
+      else if(me.days[d]&&me.days[d].length) out[d]=me.days[d];
+    }
+    S.months[k]=out;if(!had)added.push(k);
+    if(opts.login||!S.name)S.name=me.name;S.staffNo=String(me.id);S.line=me.line;
+  }
+  if(!found)throw new Error('id');
+  return added;
+}
+async function doLogin(){
+  const pw=document.getElementById('lgPw').value.trim().toUpperCase(),id=document.getElementById('lgId').value.trim(),msg=document.getElementById('lgMsg');
+  if(!pw||!id){msg.textContent='Isi dua-dua.';return}
+  msg.textContent='Sedang muat roster...';
+  try{
+    if(S.staffNo&&S.staffNo.replace(/^0+/,'')!==id.replace(/^0+/,'')){const keep={holidays:S.holidays,events:S.events,times:S.times,rates:S.rates};S=JSON.parse(JSON.stringify(BASE));Object.assign(S,keep);}
+    const added=await syncRoster(pw,id,{login:true});setTeamPw(pw);
+    const ks=Object.keys(S.months).sort(mkSort);const nowK=`${now.getFullYear()}-${now.getMonth()+1}`;cur=S.months[nowK]?nowK:(ks[ks.length-1]||cur);
+    view='kalendar';render();save(`Selamat datang, ${S.name}. Jadual ${added.length} bulan dimuat.`);
+  }catch(e){msg.textContent=!navigator.onLine?'Perlukan internet untuk masuk kali pertama.':e.message==='pw'?'Kata laluan pasukan salah.':e.message==='id'?'No. ID tak jumpa dalam roster.':'Tak dapat muat roster. Cuba lagi.';}
+}
+async function autoSync(){
+  const pw=teamPw();if(!pw||!S.staffNo||!navigator.onLine)return;
+  try{const added=await syncRoster(pw,S.staffNo);if(added.length){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster baru: '+added.map(k=>{const [yy,mm]=k.split('-').map(Number);return BULAN[mm-1]+' '+yy}).join(', '))}else{try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render()}}catch(e){}
+}
 function fillRoster(){
   const mv=document.getElementById('rMonth').value;const msg=document.getElementById('rosterMsg');
   if(!mv){msg.textContent='Pilih bulan dulu.';return}
@@ -573,7 +633,7 @@ function dlIcs(){
 root.addEventListener('change',e=>{if(e.target.id==='bkLoad'&&e.target.files[0])loadBackup(e.target.files[0])});
 // ---- events ----
 root.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-mnav],[data-ynav],[data-day],[data-msg],[data-undo],#saveEnt,#cpyot,#dlform,#dlx,#dlc,#cpy,#saveSet,#fillRoster,#bkSave,#dlics');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-mnav],[data-ynav],[data-day],[data-msg],[data-undo],#saveEnt,#cpyot,#dlform,#dlx,#dlc,#cpy,#saveSet,#fillRoster,#bkSave,#dlics,#lgGo,#rsSync,#rsOut');if(!t)return;
   if(t.dataset.ynav){const [yy,mm]=cur.split('-').map(Number);cur=`${yy+ +t.dataset.ynav}-${mm}`;render();return}
   if(t.dataset.msg){const c=S.changes[t.dataset.msg];navigator.clipboard.writeText(chMsg(t.dataset.msg,c)).then(()=>toast('Mesej disalin')).catch(()=>toast('Tak dapat salin'));return}
   if(t.dataset.undo){const k=t.dataset.undo,c=S.changes[k];const [yy,mm,dd]=k.split('-').map(Number);const mk=`${yy}-${mm}`;S.months[mk]=S.months[mk]||{};if(c.orig.length)S.months[mk][dd]=c.orig;else delete S.months[mk][dd];delete S.changes[k];render();save('Dibatalkan, ikut roster asal');return}
@@ -584,6 +644,9 @@ root.addEventListener('click',e=>{
   else if(t.id==='dlform')dlForm();
   else if(t.id==='dlx')dl('xlsx');else if(t.id==='dlc')dl('csv');else if(t.id==='cpy')copySum();
   else if(t.id==='fillRoster')fillRoster();
+  else if(t.id==='lgGo')doLogin();
+  else if(t.id==='rsSync'){const pw=teamPw();if(!pw||!S.staffNo){view='login';render();return}toast('Sedang kemas kini...');syncRoster(pw,S.staffNo).then(a=>{render();save(a.length?'Roster baru dimuat':'Roster dah terkini')}).catch(e=>toast(e.message==='pw'?'Kata laluan pasukan dah bertukar. Masuk semula.':e.message==='id'?'ID tak jumpa dalam roster':'Tiada internet / gagal'))}
+  else if(t.id==='rsOut'){if(confirm('Tukar pengguna? Simpan backup dulu kalau perlu. Data dalam phone ni akan dikosongkan.')){try{localStorage.removeItem(LS_KEY)}catch(e){};const keep={holidays:S.holidays,events:S.events};S=JSON.parse(JSON.stringify(BASE));Object.assign(S,keep);view='login';render();}}
   else if(t.id==='bkSave')saveBackup();
   else if(t.id==='dlics')dlIcs();
   else if(t.id==='cpyot'){const L=otList(cur);const [yy,mm]=cur.split('-').map(Number);const txt=`Rekod OT ${BULAN[mm-1]} ${yy}\n${S.name} (${S.staffNo})\n`+L.map(o=>`${o.r.d}/${o.r.mo} ${o.kind} ${fmtTime(o.st)}-${fmtTime(o.en)} = ${fh(o.h)} jam${o.done?'':' (akan datang)'}`).join('\n')+`\nJumlah: ${fh(L.reduce((a,b)=>a+b.h,0))} jam`;navigator.clipboard.writeText(txt).then(()=>toast('Rekod OT disalin')).catch(()=>toast('Tak dapat salin'))}
@@ -601,7 +664,8 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
-if(!S.name){ view='tetapan'; render(); setTimeout(()=>toast('Isi nama dan maklumat kau dulu dalam Tetapan'),300); }
+if(!S.staffNo){ view='login'; render(); } else { autoSync(); }
+root.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='lgPw'||e.target.id==='lgId'))doLogin()});
 })();
 </script>
 </body>

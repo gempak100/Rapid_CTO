@@ -21,8 +21,18 @@ Web app untuk jadual kerja shift, rekod OT, cuti/tukar shift dan borang **Applic
 2. Menu **⋮ → Install app** (atau *Add to Home screen*).
 3. Buka apps dari ikon → **Tetapan → Buka backup** → pilih `backup_faisal.json` (atau isi nama & maklumat sendiri untuk rakan kerja).
 
+## Masuk (rakan kerja)
+1. Buka https://gempak100.github.io/Rapid_CTO/ dalam Chrome → **⋮ → Install app**.
+2. Masukkan **kata laluan pasukan** (diberi dalam group kerja) dan **no. pekerja (ID)**.
+3. Jadual kerja kau dimuat terus dari roster. Isi maklumat borang (Depot, Designation, Grade, Contact) dalam **Tetapan**.
+
+## Roster berkunci
+- Folder `roster/` mengandungi roster setiap bulan dalam bentuk **berkunci (AES-256-GCM, kata laluan pasukan)**. Tanpa kata laluan, nama, ID dan jadual staf tidak boleh dibaca walaupun repo ini Public.
+- `roster/index.json` senarai bulan yang ada.
+- Roster bulan baru: hantar PDF roster kepada Claude untuk ditambah. Apps setiap orang akan kemas kini sendiri bila dibuka dengan internet; perubahan sendiri (tukar shift, cuti, OT) tidak ditimpa.
+
 ## Guna setiap bulan
-1. **Tetapan → Isi roster sebulan**: pilih bulan, tulis kod shift hari 1 hingga akhir bulan dipisah koma (cth `B3, B3, OFF, REST, A2/B2, B PTH STBY`).
+1. Roster dimuat sendiri. (Kalau perlu isi manual: **Tetapan → Isi roster sebulan**, kod dipisah koma, cth `B3, B3, OFF, REST, A2/B2`.)
 2. **Kalendar**: semak, tambah OT tambahan / AL / EL / CL / tukar shift dengan tekan hari.
 3. **Kalendar → Muat turun calendar bulan ni (.ics)** → buka fail untuk notification shift dalam calendar phone.
 4. **Claim → Borang Claim OT (Excel)** → fail borang siap diisi.
