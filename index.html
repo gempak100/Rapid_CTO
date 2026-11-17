@@ -407,7 +407,7 @@ function renderClaim(){
   const miss=[...new Set(rows.flatMap(r=>r.missing))];
   if(miss.length)h+=`<div class="warn">Waktu untuk ${miss.join(', ')} belum diisi. Elaun tetap dikira, tapi jam OT tak boleh dikira. Isi di tab Tetapan.</div>`;
   h+=`
-  <div class="row"><button class="btn primary" id="dlform">Borang Claim OT (Excel)</button><button class="btn" id="dlc">Ringkasan CSV</button><button class="btn" id="cpy">Salin ringkasan</button></div>
+  <div class="row"><button class="btn primary" id="dlform">Cetak Tugasan Harian</button><button class="btn" id="dlc">Ringkasan CSV</button><button class="btn" id="cpy">Salin ringkasan</button></div>
   <p class="note">Borang Claim OT ikut format <i>Application for Overtime / Allowance</i>: waktu kerja ikut masa shift penuh, OT dijumlahkan dalam satu petak, masa lepas tengah malam ditulis 24xx.</p>`;
   return h;
 }
@@ -429,7 +429,7 @@ function renderOT(){
   L.forEach(o=>{const r=o.r;h+=`<tr><td>${r.d}/${r.mo} ${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'][new Date(r.y,r.mo-1,r.d).getDay()]}</td><td><span class="pill ${o.mtype==='ot'?'p-ev':o.mtype?'p-leave':o.kind==='Double shift'?'p-ot':'p-petang'}">${o.kind}</span></td><td>${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</td><td>${esc(o.note)}${o.full?` <span class="note">(dikira ${fh(o.h)} daripada ${fh(o.full)} jam, had 9 jam OT)</span>`:''}</td><td class="num">${fh(o.h)}</td><td>${o.done?'<span class="pill p-stby">✓ Dah buat</span>':'<span class="pill p-off">Akan datang</span>'}</td></tr>`});
   if(!L.length)h+=`<tr><td colspan="6" class="note">Tiada OT bulan ni.</td></tr>`;
   h+=`</tbody><tfoot><tr><td colspan="4">Jumlah</td><td class="num">${fh(tot)}</td><td>${fh(done)} dah buat</td></tr></tfoot></table></div>
-  <div class="row"><button class="btn primary" id="dlform">Borang Claim OT (Excel)</button><button class="btn" id="cpyot">Salin rekod OT</button></div>`;
+  <div class="row"><button class="btn primary" id="dlform">Cetak Tugasan Harian</button><button class="btn" id="cpyot">Salin rekod OT</button></div>`;
   return h;
 }
 function leaveUsed(y){
