@@ -628,7 +628,7 @@ function formRows(k){
     const T4=dt=>hhmm(dt,y,mo,d);
     if(r.shifts.length){
       { const parts=[r.shifts[0],...r.shifts.slice(1).map(x=>'OT '+x)]; if(man.some(o=>o.mtype==='cover'))parts.push('OT Cover Meal'); lines.push(parts.join('/')+' *Excess Working'); }
-      if(ch&&ch.type==='swap')lines.push(`*SWAP${ch.with?' '+ch.with.toUpperCase():''} (ASAL ${ch.orig.join('/')})`);
+      /* tukar shift: borang tulis duty baru sahaja, tanpa nama rakan */
       if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
       man.filter(o=>o.mtype!=='cover').forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
       const st=r.spans[0]?r.spans[0][0]:null;
@@ -655,11 +655,7 @@ function formRows(k){
     }
     const shiftRM=r.amt.pagi+r.amt.petang;if(shiftRM)c.M=shiftRM;
     if(r.amt.cto)c.R=r.amt.cto;if(r.amt.stby)c.Q=r.amt.stby;
-    if(lines.length>1&&/ \*Excess Working$/.test(lines[0])){
-      // Susun atas-bawah: cell dirata kiri, baris tambahan dianjak dengan space selebar kod shift (ukuran font Tahoma)
-      const code=lines[0].replace(/\*Excess Working$/,'');const n=Math.round(tw(code)/tw(' '));
-      c.B={left:true,text:[lines[0],...lines.slice(1).map(l=>' '.repeat(n)+l)].join('\n')};
-    } else c.B=lines.join('\n');
+    c.B=lines.join('\n'); /* semua baris di tengah (keputusan Faisal 17 Nov) */
     for(const x in T)if(typeof c[x]==='number')T[x]+=c[x];
     rows[d]=c;
   }
