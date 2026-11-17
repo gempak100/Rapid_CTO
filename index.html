@@ -104,7 +104,7 @@ try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if
 
 S.changes = S.changes || {}; S.otManual = S.otManual || {}; S.otDuty = S.otDuty || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
 const LEAVES=['AL','EL','CL','MC'];const LEAVE_NAME={AL:'Cuti Tahunan',EL:'Cuti Kecemasan',CL:'Compassionate Leave',MC:'Cuti Sakit (MC)',swap:'Tukar shift'};
-const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'OT Cover Meal Break',ops:'Ops Requirement',signoff:'Exceed sign off'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL',ops:'OPS REQ',signoff:'EXCEED SIGN OFF'};
+const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'OT Cover Meal Break',ops:'Ops Requirement',signoff:'Exceed sign off'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL',ops:'OPS REQ',signoff:'Ex Sign Off'};
 const COVER_H=4; // OT cover meal biasanya 4 jam
 const OT_MAX=9; // OT maksimum 9 jam sehari (1 jam excess duty asal dikira berasingan)
 function isPagi(c){c=String(c);if(c.startsWith('BTS'))return c==='BTS A';return c[0]==='A'}
@@ -209,7 +209,7 @@ function dayCalc(k,d){
   man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:m.type==='ops'?(spans.length&&+m.en<=s0?'Ops Req (masuk awal)':spans.length&&+m.st>=s1?'Ops Req (balik lewat)':'Ops Requirement'):(MAN_KIND[m.type]||'OT tambahan'),mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   if(p.offOT){const sp=shiftSpan(p.offOT,y,mo,d);if(sp){p.offSpan=sp;if(!p.restOT)ot.push({kind:'OT dipanggil (OFF)',st:sp[0],en:sp[1],h:(sp[1]-sp[0])/3600000,note:p.offOT});}}
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
-  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover'||o.mtype==='ops'||o.mtype==='signoff')continue; /* ops req: permintaan management, boleh lebih 9 jam */ if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
+  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover'||o.mtype==='ops')continue; /* exceed sign off: dikira dalam had 9 jam */ /* ops req: permintaan management, boleh lebih 9 jam */ if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0&&!ot[i].full) ot.splice(i,1);
     jamH=ot.filter(o=>o.kind==='1 jam shift').reduce((a,b)=>a+b.h,0); if(!jamH)jamWin=null;
     otH=ot.filter(o=>o.kind==='Double shift').reduce((a,b)=>a+b.h,0);
