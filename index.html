@@ -371,17 +371,31 @@ function swapUI(ch,d){
   <select id="swSel"><option value="">— Pilih shift —</option>${codes.map(c=>`<option value="${esc(c)}" ${cur0===c?'selected':''}>${esc(c)}${S.times[c]?' ('+tSpan(S.times[c])+')':''}</option>`).join('')}<option value="__lain" ${isLain?'selected':''}>Lain (taip sendiri, cth A2 / B2)</option></select>
   <input id="swNew" placeholder="Taip shift (cth A2 / B2)" value="${esc(cur0)}" style="display:${isLain?'block':'none'}">
   <label class="note" style="margin:4px 0 0">Tukar dengan siapa</label>
-  ${team.length?`<select id="swWho"><option value="">— Pilih rakan —</option>${team.map(x=>{const sl=(x.days[d]||[]).join(' / ');return `<option value="${esc(x.name+' ('+x.id+')')}" data-sh="${esc(sl)}" ${w0===x.name+' ('+x.id+')'?'selected':''}>${esc(x.name)} (${esc(x.id)})${sl?' · '+esc(sl):''}</option>`}).join('')}<option value="__lain" ${w0&&!wIn?'selected':''}>Lain (taip nama)</option></select>`:''}
-  <input id="swWith" placeholder="Nama rakan" value="${esc(w0)}" style="display:${team.length&&(wIn||!w0)?'none':'block'}">
+  <div style="position:relative"><input id="swWith" data-day="${d}" autocomplete="off" placeholder="${team.length?'Taip nama atau no. ID rakan':'Nama rakan'}" value="${esc(w0)}" style="width:100%;box-sizing:border-box">
+  <div id="swSug" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:5;background:var(--card,#fff);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:260px;overflow-y:auto"></div></div>
   ${team.length?'<span class="note">Pilih rakan → shift dia hari ni diisi sendiri sebagai shift baru (boleh ubah).</span>':''}</div>`;
 }
 function bindSwap(md){
-  const sel=md.querySelector('#swSel'),inp=md.querySelector('#swNew'),who=md.querySelector('#swWho'),wi=md.querySelector('#swWith');
+  const sel=md.querySelector('#swSel'),inp=md.querySelector('#swNew'),wi=md.querySelector('#swWith'),sug=md.querySelector('#swSug');
   if(sel)sel.onchange=()=>{if(sel.value==='__lain'){inp.style.display='block';inp.focus()}else{inp.style.display='none';inp.value=sel.value}};
-  if(who)who.onchange=()=>{const o=who.selectedOptions[0];if(who.value==='__lain'){wi.style.display='block';wi.value='';wi.focus();return}
-    wi.style.display='none';wi.value=who.value;const sh=(o&&o.dataset.sh||'').trim();
-    if(sh){const codes=swapCodes();const base=sh.toUpperCase();const hit=codes.find(c=>c===base)||codes.find(c=>base.split(' / ').length===1&&base.startsWith(c+' '));
+  if(!wi||!sug)return;
+  const me=String(S.staffNo||'').replace(/^0+/,'');const d=+wi.dataset.day;
+  const team=teamFor(cur).filter(x=>String(x.id).replace(/^0+/,'')!==me);
+  if(!team.length)return;
+  const norm=t=>String(t).toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  const pick=x=>{const sh=(x.days[d]||[]).join(' / ');wi.value=`${x.name} (${x.id})`;sug.style.display='none';
+    if(sh&&sel){const codes=swapCodes();const base=sh.toUpperCase();const hit=codes.find(c=>c===base)||codes.find(c=>base.split(' / ').length===1&&base.startsWith(c+' '));
       if(hit){sel.value=hit;inp.value=hit;inp.style.display='none'}else{sel.value='__lain';inp.value=sh;inp.style.display='block'}}};
+  const show=()=>{const q=norm(wi.value);if(!q){sug.style.display='none';return}
+    const words=q.split(' ');
+    const hits=team.filter(x=>{const n=norm(x.name),id=String(x.id);return words.every(w=>n.includes(w)||id.includes(w))})
+      .sort((a,b)=>(norm(a.name).startsWith(q)?0:1)-(norm(b.name).startsWith(q)?0:1)||a.name.localeCompare(b.name)).slice(0,8);
+    if(!hits.length){sug.innerHTML='<div class="note" style="padding:10px">Tiada dalam roster — nama yang ditaip akan disimpan.</div>';sug.style.display='block';return}
+    sug.innerHTML=hits.map((x,i)=>{const sh=(x.days[d]||[]).join(' / ');return `<div data-i="${i}" style="padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer"><b>${esc(x.name)}</b> <span class="note">(${esc(x.id)})</span>${sh?`<div class="note">Hari ni: ${esc(sh)}</div>`:''}</div>`}).join('');
+    sug.style.display='block';
+    sug.querySelectorAll('[data-i]').forEach(el=>el.onmousedown=el.ontouchstart=e=>{e.preventDefault();pick(hits[+el.dataset.i])});};
+  wi.addEventListener('input',show);wi.addEventListener('focus',show);
+  wi.addEventListener('blur',()=>setTimeout(()=>sug.style.display='none',150));
 }
 function renderCal(y,m){
   const first=new Date(y,m-1,1).getDay();const n=monthDays(cur);const mo=S.months[cur]||{};
