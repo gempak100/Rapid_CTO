@@ -256,14 +256,39 @@ function activeDay(){
     if(off===0||(nw>=st&&nw<=en+3*3600000))return {k,d:dt.getDate(),m:dt.getMonth()+1,y:dt.getFullYear(),r};}
   return null;
 }
+/* ===== Input masa 24 jam + auto pagi/petang ikut shift asal =====
+   Shift asal A (pagi): 0700 -> 0700, 0100 -> 1300 (dalam waktu duty)
+   Shift asal B (petang): 0730 -> 1930, 1230/0030 -> 2430, 0100 -> 2500
+   Masa >= 13 ditulis terus (24 jam). Lepas tengah malam boleh tulis 24xx/25xx. */
+function t24a(r,mode){if(!r||!r.spans||!r.spans.length)return '';const b=new Date(r.y,r.mo-1,r.d);
+  const w0=Math.min(...r.spans.map(x=>(x[0]-b)/3600000)),w1=Math.max(...r.spans.map(x=>(x[1]-b)/3600000));
+  const pg=isPagi(r.shifts[0]||'')?1:0;return ` data-w0="${w0}" data-w1="${w1}" data-pagi="${pg}" data-mode="${mode||''}"`}
+function t24in(id,r,mode,w){return `<input id="${id}" class="t24" type="text" inputmode="numeric" autocomplete="off" placeholder="HHMM" maxlength="5" style="width:${w||110}px"${t24a(r,mode)}>`}
+function norm24(raw,el){
+  const t=String(raw||'').trim().replace(/[^0-9]/g,'');if(!t)return '';
+  let h,m;if(t.length<=2){h=+t;m=0}else{h=+t.slice(0,-2);m=+t.slice(-2)}
+  if(isNaN(h)||isNaN(m)||m>59||h>47)return null;
+  if(h<=12&&el&&el.dataset.w0!==undefined&&el.dataset.w0!==''){
+    const w0=+el.dataset.w0,w1=+el.dataset.w1,pg=el.dataset.pagi==='1',mode=el.dataset.mode,x=h%12+m/60;
+    const c=pg?[x,x+12,x+24]:[x+12,x+24,x];
+    let pick;
+    if(mode==='after'){pick=c.filter(v=>v>=w1).sort((a,b)=>a-b)[0]}
+    else if(mode==='before'){pick=c.filter(v=>v<=w0).sort((a,b)=>b-a)[0]}
+    if(pick===undefined){const dist=v=>v<w0-1?w0-1-v:v>w1+1?v-w1-1:0;pick=c.reduce((best,v)=>dist(v)<dist(best)?v:best,c[0])}
+    h=Math.floor(pick);
+  }
+  return pad(h)+':'+pad(m);
+}
+document.addEventListener('change',e=>{const el=e.target;if(!el.classList||!el.classList.contains('t24'))return;
+  const v=norm24(el.value,el);if(v===null){el.value='';toast('Masa tak sah. Tulis 24 jam, cth 1930');return}el.value=v;},true);
 function hm(dt){return pad(dt.getHours())+':'+pad(dt.getMinutes())}
 function openOps(ad){
   const st=new Date(Math.min(...ad.r.spans.map(x=>+x[0]))),en=new Date(Math.max(...ad.r.spans.map(x=>+x[1])));
   const md=document.createElement('div');md.className='modal';
   md.innerHTML=`<div class="card"><b>Ops Requirement · ${ad.d}/${ad.m}</b><p class="note">Duty ${esc(ad.r.raw)}: ${hhmm(st,ad.y,ad.m,ad.d)}–${hhmm(en,ad.y,ad.m,ad.d)}</p>
   <div class="seg"><label><input type="radio" name="opsM" value="awal">Masuk awal</label><label><input type="radio" name="opsM" value="lewat" checked>Balik lewat</label></div>
-  <div id="opsAwal" style="display:none;margin-top:10px"><label>Masa lapor diri<br><input id="opsA" type="time" style="width:140px"></label><div class="note">OT dari masa lapor hingga duty mula (${hhmm(st,ad.y,ad.m,ad.d)}).</div></div>
-  <div id="opsLewat" style="margin-top:10px"><label>Masa sign off sebenar<br><input id="opsL" type="time" style="width:140px"></label><div class="note">OT dari duty habis (${hhmm(en,ad.y,ad.m,ad.d)}) hingga masa sign off.</div></div>
+  <div id="opsAwal" style="display:none;margin-top:10px"><label>Masa lapor diri<br>${t24in('opsA',ad.r,'before',140)}</label><div class="note">OT dari masa lapor hingga duty mula (${hhmm(st,ad.y,ad.m,ad.d)}).</div></div>
+  <div id="opsLewat" style="margin-top:10px"><label>Masa sign off sebenar<br>${t24in('opsL',ad.r,'after',140)}</label><div class="note">OT dari duty habis (${hhmm(en,ad.y,ad.m,ad.d)}) hingga masa sign off.</div></div>
   <input id="opsN" placeholder="Sebab / event (cth KL RUN, Konsert)" style="width:100%;margin-top:10px">
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="qX">Batal</button><button class="btn primary" id="qG">Simpan</button></div></div>`;
   document.body.appendChild(md);
@@ -281,11 +306,11 @@ function openQuick(type){
   if(type==='ops'){openOps(ad);return}
   const md=document.createElement('div');md.className='modal';
   md.innerHTML=`<div class="card"><b>${MAN_KIND[type]} · ${ad.d}/${ad.m}</b><p class="note">Masukkan masa yang supervisor bagi.${type==='cover'?' Biasanya 4 jam: isi masa mula, masa tamat diisi sendiri.':''}${type==='ops'?' Contoh: duty habis 0130, sambung untuk event 0130–0300. Catatan (cth nama event) akan ditulis dalam kurungan.':''}${type==='ot'?'':' Tidak dikira dalam had 9 jam OT.'}</p>
-  <div class="row"><input id="qS" type="time" style="width:120px"><span>–</span><input id="qE" type="time" style="width:120px"></div>
+  <div class="row">${t24in('qS',ad.r,'',120)}<span>–</span>${t24in('qE',ad.r,'',120)}</div>
   <input id="qN" placeholder="${type==='ops'?'Sebab / event (cth KL RUN)':'Catatan (pilihan)'}" style="width:100%;margin-top:8px">
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="qX">Batal</button><button class="btn primary" id="qG">Simpan</button></div></div>`;
   document.body.appendChild(md);
-  if(type==='cover'){const qs=md.querySelector('#qS'),qe=md.querySelector('#qE');qs.addEventListener('change',()=>{if(qs.value){const [h,mi]=qs.value.split(':').map(Number);qe.value=pad((h+COVER_H)%24)+':'+pad(mi);}});}
+  if(type==='cover'){const qs=md.querySelector('#qS'),qe=md.querySelector('#qE');qs.addEventListener('change',()=>{if(qs.value){const [h,mi]=qs.value.split(':').map(Number);qe.value=pad(h+COVER_H)+':'+pad(mi);}});}
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='qX')md.remove()});
   md.querySelector('#qG').onclick=()=>{const a=md.querySelector('#qS').value,b=md.querySelector('#qE').value;if(!a||!b){toast('Isi masa mula dan tamat');return}
     const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#qN').value.trim(),type});md.remove();render();save(MAN_KIND[type]+' disimpan');};
@@ -491,7 +516,7 @@ function openDay(d){
   <span class="note">${(S.months[cur]||{})[d]&&parseDay((S.months[cur]||{})[d]).shifts.length>1?'Hari ni dah double shift dalam roster.':'Pilih duty OT yang supervisor minta.'}</span></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">OT tambahan / Meal break</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
   ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
-  <div class="row" style="margin-top:6px"><select id="otT"><option value="ot">OT tambahan</option><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option></select><input id="otS" type="time" style="width:110px"><span>–</span><input id="otE" type="time" style="width:110px"><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div></div>
+  <div class="row" style="margin-top:6px"><select id="otT"><option value="ot">OT tambahan</option><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option></select>${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}<input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
   <div class="row"><b style="font-size:13px">Cuti umum</b><input id="dh" placeholder="Kosong kalau bukan cuti" value="${esc(hol(y,m,d)||'')}" style="flex:1"></div>
   <div style="margin-top:8px"><b style="font-size:13px">Event Bukit Jalil</b>${evs(y,m,d).map(e=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill p-ev">★ ${esc(e.title)} · ${esc(e.venue||'')}${e.time?' '+e.time:''}</span><button class="btn" style="padding:3px 8px" data-delev="${esc(e.title)}">Buang</button></div>`).join('')}
@@ -499,7 +524,7 @@ function openDay(d){
   <div class="row" style="margin-top:10px">${links}</div>
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="dx">Batal</button><button class="btn primary" id="ds">Simpan</button></div></div>`;
   document.body.appendChild(md);
-  { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad((h+COVER_H)%24)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill); }
+  { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad(h+COVER_H)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill); }
   bindSwap(md);
   const ctoTouched=false; /* kotak Tuntut CTO dibuang: CTO ikut hari kerja sahaja */
   md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
