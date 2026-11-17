@@ -158,7 +158,7 @@ function dayCalc(k,d){
   let p=parseDay(slots);
   const od=S.otDuty[dkey(y,mo,d)];
   if(od&&p.shifts.length===1){p=parseDay([...slots,od]);p.called=od;} /* OFF/REST/cuti: tak boleh dipanggil OT */
-  const ov=S.cto[k]?S.cto[k][d]:undefined;
+  const ov=undefined; /* override CTO manual tidak lagi digunakan */
   const ctoDefault = p.cto || (S.ctoAuto!==false && p.shifts.length>0);
   const ctoFlag = ov===1?true:ov===0?false:ctoDefault;
   const holiday = hol(y,mo,d);
@@ -486,7 +486,6 @@ function openDay(d){
   <div class="seg" style="margin-top:6px">${[['none','Ikut roster'],['swap','Tukar shift'],['AL','AL'],['EL','EL'],['CL','CL'],['MC','MC']].map(([v,l])=>`<label><input type="radio" name="chg" value="${v}" ${(ch?ch.type:'none')===v?'checked':''}>${l}</label>`).join('')}</div>
   <div id="chSwap" style="margin-top:8px;display:${ch&&ch.type==='swap'?'block':'none'}">${swapUI(ch,d)}</div>
   <div id="chNote" style="margin-top:8px;display:${ch&&ch.type!=='none'?'block':'none'}"><input id="chN" placeholder="Catatan (sebab / no. rujukan)" value="${esc(ch&&ch.note||'')}" style="width:100%"></div></div>
-  <label class="row" style="margin-top:10px"><input type="checkbox" id="dcto" ${r.ctoFlag?'checked':''}> Tuntut CTO hari ni</label>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:${r.shifts.length?'block':'none'}"><b style="font-size:13px">☎ OT dipanggil supervisor</b>
   <div class="row" style="margin-top:6px"><select id="odSel"><option value="">Tiada</option>${Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b):isPagi(a)?-1:1)).map(c=>`<option value="${esc(c)}" ${S.otDuty[ck]===c?'selected':''}>${esc(c)} (${tSpan(S.times[c])})</option>`).join('')}</select>
   <span class="note">${(S.months[cur]||{})[d]&&parseDay((S.months[cur]||{})[d]).shifts.length>1?'Hari ni dah double shift dalam roster.':'Pilih duty OT yang supervisor minta.'}</span></div></div>
@@ -502,7 +501,7 @@ function openDay(d){
   document.body.appendChild(md);
   { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad((h+COVER_H)%24)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill); }
   bindSwap(md);
-  let ctoTouched=false; md.querySelector('#dcto').onchange=()=>{ctoTouched=true};
+  const ctoTouched=false; /* kotak Tuntut CTO dibuang: CTO ikut hari kerja sahaja */
   md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='dx')md.remove();
     const dot=e.target.closest('[data-delot]');if(dot){const a=S.otManual[ck]||[];a.splice(+dot.dataset.delot,1);if(!a.length)delete S.otManual[ck];md.remove();render();save('OT dibuang');return}
