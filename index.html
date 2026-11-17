@@ -602,7 +602,11 @@ function buildClaimForm(k){
   setRich('C3',S.name);setRich('C4',F.depot||'');setRich('C5',F.designation||'');setRich('C6',' '+(F.contact||''));
   setRich('M3',' '+S.staffNo);setRich('M4',F.grade||'');setRich('M5',' '+BULAN_EN[mo-1]+' '+y);
   set('D52',F.superior||' ');set('D53',' ');
-  for(const [d,c] of Object.entries(rows)){const r=13+ +d;for(const [col,v] of Object.entries(c))set(col+r,v);}
+  for(const [d,c] of Object.entries(rows)){const r=13+ +d;for(const [col,v] of Object.entries(c))set(col+r,v);
+    // tinggikan baris bila ada lebih 2 baris tulisan (asal 30pt muat 2 baris)
+    const nl=Math.max(...['B','C','D','H','I'].map(k=>{const v=c[k];if(!v)return 1;const t=v.runs?v.runs.map(x=>x[0]).join(''):String(v);return t.split('\n').length}));
+    if(nl>2){const ht=Math.max(30,nl*11+6);x=x.replace(new RegExp('(<row r="'+r+'"[^>]*?) ht="[^"]*"'),'$1 ht="'+ht+'"');}
+  }
   for(const [col,v] of Object.entries(T))if(v)set(col+'45',+fh(v));
   const sheet=new TextEncoder().encode(x);
   const files=FORM_TPL.entries.map(e=>e.n==='xl/worksheets/sheet2.xml'?{n:e.n,m:0,c:crc32(sheet),u:sheet.length,data:sheet}:{n:e.n,m:e.m,c:e.c,u:e.u,data:b64bytes(e.d)});
