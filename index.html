@@ -608,6 +608,8 @@ function buildClaimForm(k){
     // Saiz petak kekal macam borang asal (30pt muat 2 baris). Kalau lebih 2 baris, kecilkan tulisan petak tu sahaja supaya muat.
     const lines=k=>{const v=c[k];if(!v)return 1;const t=v.text!==undefined?v.text:String(v);return t.split('\n').length};
     for(const k of ['B','C','D','H','I']){const n=lines(k);if(n>2){const sz=Math.min(8,Math.floor(28/(n*1.21)*2)/2);c[k]=typeof c[k]==='object'?{...c[k],sz}:{text:c[k],sz};}}
+    // keterangan panjang (cth A2/OT B1/OT Cover Meal) dikecilkan supaya muat satu baris dalam lebar lajur asal
+    if(c.B){const t=typeof c.B==='object'?c.B.text:c.B;const mw=Math.max(...String(t).split('\n').map(tw));if(mw*8>138){const sz=Math.max(6,Math.floor(138/mw*2)/2);const cur=typeof c.B==='object'&&c.B.sz?c.B.sz:8;c.B=typeof c.B==='object'?{...c.B,sz:Math.min(cur,sz)}:{text:c.B,sz};}}
     for(const [col,v] of Object.entries(c))set(col+r,v);
   }
   for(const [col,v] of Object.entries(T))if(v)set(col+'45',+fh(v));
