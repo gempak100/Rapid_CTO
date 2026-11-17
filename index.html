@@ -349,11 +349,11 @@ function renderClaim(){
   const {rows,T}=monthCalc(cur);
   let h=`<div class="stats">
   <div class="stat"><div class="l">Jumlah elaun</div><div class="v">${rm(T.total)}</div></div>
-  <div class="stat"><div class="l">Shift pagi × ${rm(S.rates.pagi)}</div><div class="v">${T.nPagi}</div></div>
-  <div class="stat"><div class="l">Shift petang × ${rm(S.rates.petang)}</div><div class="v">${T.nPetang}</div></div>
-  <div class="stat"><div class="l">CTO × ${rm(S.rates.cto)}</div><div class="v">${T.nCto}</div></div>
-  <div class="stat"><div class="l">Jam OT (dah buat)</div><div class="v">${fh(T.otDone)} <span class="sub">/ ${fh(T.otTot)} jam</span></div></div>
-  <div class="stat"><div class="l">Kerja hari cuti umum</div><div class="v">${T.nPH}</div></div></div>`;
+  <div class="stat"><div class="l">Shift pagi × ${rm(S.rates.pagi)}</div><div class="sub">Total bekerja: <b>${T.nPagi} hari</b></div><div class="v">${rm(T.pagi)}</div></div>
+  <div class="stat"><div class="l">Shift petang × ${rm(S.rates.petang)}</div><div class="sub">Total bekerja: <b>${T.nPetang} hari</b></div><div class="v">${rm(T.petang)}</div></div>
+  <div class="stat"><div class="l">CTO × ${rm(S.rates.cto)}</div><div class="sub">Total bekerja: <b>${T.nCto} hari</b></div><div class="v">${rm(T.cto)}</div></div>
+  <div class="stat"><div class="l">Jam OT (dah dibuat)</div><div class="sub">Dah dibuat / jumlah</div><div class="v">${fh(T.otDone)} <span class="sub">/ ${fh(T.otTot)} jam</span></div></div>
+  <div class="stat"><div class="l">Kerja hari cuti umum</div><div class="sub">Jumlah</div><div class="v">${T.nPH} <span class="sub">hari</span></div></div></div>`;
   const miss=[...new Set(rows.flatMap(r=>r.missing))];
   if(miss.length)h+=`<div class="warn">Waktu untuk ${miss.join(', ')} belum diisi. Elaun tetap dikira, tapi jam OT tak boleh dikira. Isi di tab Tetapan.</div>`;
   h+=`<div class="card" style="overflow-x:auto"><table><thead><tr><th>Tarikh</th><th>Shift</th><th>Masa</th><th class="num">Pagi</th><th class="num">Petang</th><th class="num">CTO</th><th class="num">Jam OT</th><th class="num">Jumlah elaun</th></tr></thead><tbody>`;
