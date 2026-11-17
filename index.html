@@ -280,7 +280,7 @@ function norm24(raw,el){
   return pad(h)+':'+pad(m);
 }
 document.addEventListener('change',e=>{const el=e.target;if(!el.classList||!el.classList.contains('t24'))return;
-  const v=norm24(el.value,el);if(v===null){el.value='';toast('Masa tak sah. Tulis 24 jam, cth 1930');return}el.value=v;},true);
+  el.dataset.raw=el.value;const v=norm24(el.value,el);if(v===null){el.value='';toast('Masa tak sah. Tulis 24 jam, cth 1930');return}el.value=v;},true);
 function hm(dt){return pad(dt.getHours())+':'+pad(dt.getMinutes())}
 function openOps(ad){
   const st=new Date(Math.min(...ad.r.spans.map(x=>+x[0]))),en=new Date(Math.max(...ad.r.spans.map(x=>+x[1])));
@@ -296,8 +296,8 @@ function openOps(ad){
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='qX')md.remove()});
   md.querySelector('#qG').onclick=()=>{
     const mode=md.querySelector('input[name=opsM]:checked').value;let a,b;
-    if(mode==='awal'){a=md.querySelector('#opsA').value;b=hm(st);if(!a){toast('Isi masa lapor diri');return}}
-    else{a=hm(en);b=md.querySelector('#opsL').value;if(!b){toast('Isi masa sign off');return}}
+    const hr=x=>hhmm(x,ad.y,ad.m,ad.d).replace(/(\d\d)$/,':$1');if(mode==='awal'){a=md.querySelector('#opsA').value;b=hr(st);if(!a){toast('Isi masa lapor diri');return}}
+    else{a=hr(en);b=md.querySelector('#opsL').value;if(!b){toast('Isi masa sign off');return}}
     const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#opsN').value.trim(),type:'ops',mode});md.remove();render();save('Ops Requirement disimpan ('+(mode==='awal'?'masuk awal':'balik lewat')+')');
   };
 }
@@ -516,7 +516,9 @@ function openDay(d){
   <span class="note">${(S.months[cur]||{})[d]&&parseDay((S.months[cur]||{})[d]).shifts.length>1?'Hari ni dah double shift dalam roster.':'Pilih duty OT yang supervisor minta.'}</span></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Meal break / OT Cover Meal / Ops Requirement</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
   ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
-  <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option></select>${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}<input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div></div>
+  <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
+  <div id="otOpsBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="seg"><label><input type="radio" name="otOpsM" value="awal">Masuk awal</label><label><input type="radio" name="otOpsM" value="lewat" checked>Balik lewat</label></div>
+  <div class="row" style="margin-top:6px"><span id="otOpsL" class="note">Masa sign off sebenar</span>${t24in('otOps',r,'after',110)}<span id="otOpsH" class="note">OT dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Ops Requirement hanya untuk hari bertugas.</div>'}</div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
   <div class="row"><b style="font-size:13px">Cuti umum</b><input id="dh" placeholder="Kosong kalau bukan cuti" value="${esc(hol(y,m,d)||'')}" style="flex:1"></div>
   <div style="margin-top:8px"><b style="font-size:13px">Event Bukit Jalil</b>${evs(y,m,d).map(e=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill p-ev">★ ${esc(e.title)} · ${esc(e.venue||'')}${e.time?' '+e.time:''}</span><button class="btn" style="padding:3px 8px" data-delev="${esc(e.title)}">Buang</button></div>`).join('')}
@@ -524,7 +526,12 @@ function openDay(d){
   <div class="row" style="margin-top:10px">${links}</div>
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="dx">Batal</button><button class="btn primary" id="ds">Simpan</button></div></div>`;
   document.body.appendChild(md);
-  { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad(h+COVER_H)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill); }
+  { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad(h+COVER_H)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill);
+    const opsUI=()=>{const on=ts.value==='ops';md.querySelector('#otSE').style.display=on?'none':'';md.querySelector('#otOpsBox').style.display=on?'block':'none';};ts.addEventListener('change',opsUI);
+    md.querySelectorAll('input[name=otOpsM]').forEach(i=>i.onchange=()=>{const aw=md.querySelector('input[name=otOpsM]:checked').value==='awal';const el=md.querySelector('#otOps');el.dataset.mode=aw?'before':'after';
+      const sp=r.spans,st=new Date(Math.min(...sp.map(x=>+x[0]))),en=new Date(Math.max(...sp.map(x=>+x[1])));
+      md.querySelector('#otOpsL').textContent=aw?'Masa lapor diri':'Masa sign off sebenar';md.querySelector('#otOpsH').textContent=aw?`OT dari masa lapor hingga duty mula (${hhmm(st,r.y,r.mo,r.d)})`:`OT dari duty habis (${hhmm(en,r.y,r.mo,r.d)}) hingga sign off`;
+      if(el.dataset.raw){const v=norm24(el.dataset.raw,el);if(v)el.value=v;}}); }
   bindSwap(md);
   const ctoTouched=false; /* kotak Tuntut CTO dibuang: CTO ikut hari kerja sahaja */
   md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
@@ -550,9 +557,11 @@ function openDay(d){
     if(!parseDay(v).shifts.length)odv=''; /* OFF/REST/cuti: tak boleh dipanggil OT */
     if(odv&&parseDay(v).shifts.length>1&&!(S.otDuty[ck]&&v.includes(S.otDuty[ck]))){toast('Hari ni dah double shift, tak boleh tambah OT duty lagi');return}
     if(odv)S.otDuty[ck]=odv;else delete S.otDuty[ck];
-    const os=md.querySelector('#otS').value,oe=md.querySelector('#otE').value;
+    let os=md.querySelector('#otS').value,oe=md.querySelector('#otE').value,opsMode;
+    if(md.querySelector('#otT').value==='ops'){os='';oe='';const el=md.querySelector('#otOps');if(el&&el.value){const sp=r.spans,st=new Date(Math.min(...sp.map(x=>+x[0]))),en=new Date(Math.max(...sp.map(x=>+x[1])));
+      opsMode=md.querySelector('input[name=otOpsM]:checked').value;const hr=x=>hhmm(x,r.y,r.mo,r.d).replace(/(\d\d)$/,':$1');if(opsMode==='awal'){os=el.value;oe=hr(st)}else{os=hr(en);oe=el.value}}}
     if(os&&oe&&md.querySelector('#otT').value==='cover'&&v.length>1){toast('Hari double shift tak boleh claim OT Cover Meal Break');return}
-    if(os&&oe){(S.otManual[ck]=S.otManual[ck]||[]).push({start:os,end:oe,note:md.querySelector('#otN').value.trim(),type:md.querySelector('#otT').value});}
+    if(os&&oe){(S.otManual[ck]=S.otManual[ck]||[]).push({start:os,end:oe,note:md.querySelector('#otN').value.trim(),type:md.querySelector('#otT').value,...(opsMode?{mode:opsMode}:{})});}
     else if(os||oe){toast('Isi masa mula dan tamat OT');return}
     const et=md.querySelector('#evt').value.trim();if(et)S.events.push({date:hk,title:et,venue:md.querySelector('#evv').value.trim()||'Bukit Jalil',time:md.querySelector('#evh').value});
     md.remove();render();save('Hari dikemas kini');
