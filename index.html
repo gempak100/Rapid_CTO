@@ -104,7 +104,7 @@ try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if
 
 S.changes = S.changes || {}; S.otManual = S.otManual || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
 const LEAVES=['AL','EL','CL','MC'];const LEAVE_NAME={AL:'Cuti Tahunan',EL:'Cuti Kecemasan',CL:'Compassionate Leave',MC:'Cuti Sakit (MC)',swap:'Tukar shift'};
-const OT_MAX=9;
+const OT_MAX=10; // 9 jam OT + 1 jam excess sehari
 function isPagi(c){c=String(c);if(c.startsWith('BTS'))return c==='BTS A';return c[0]==='A'}
 S.holidays = S.holidays || BASE.holidays || {}; S.events = S.events || BASE.events || [];
 const HARI = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
@@ -177,7 +177,7 @@ function dayCalc(k,d){
   if(jamWin)ot.push({kind:'1 jam shift',st:jamWin[0],en:jamWin[1],h:jamH,note:p.shifts[0]+(swapped?' (tukar)':'')});
   if(dsWin)ot.push({kind:'Double shift',st:dsWin[0],en:dsWin[1],h:otH,note:p.shifts.join(' + ')});
   man.forEach(m=>ot.push({kind:'OT tambahan',st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
-  // OT maksimum 9 jam sehari: potong dari hujung
+  // Maksimum sehari: 9 jam OT + 1 jam excess = 10 jam; potong dari hujung
   { let left=OT_MAX; for(const o of ot){ if(o.h>left){o.h=Math.max(0,left);o.en=new Date(+o.st+o.h*3600000);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0) ot.splice(i,1);
     jamH=ot.filter(o=>o.kind==='1 jam shift').reduce((a,b)=>a+b.h,0); if(!jamH)jamWin=null;
