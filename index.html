@@ -307,6 +307,31 @@ function render(){
   if(view==='ot') h+=renderOT();
   root.innerHTML=h;
 }
+/* ===== Tukar shift: pilih shift & rakan dari roster ===== */
+function teamFor(k){return ((S.team&&S.team[k])||(typeof TEAM!=='undefined'&&TEAM[k])||[])}
+function swapCodes(){return [...Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b,undefined,{numeric:true}):isPagi(a)?-1:1)),'OFF','REST']}
+function swapUI(ch,d){
+  const cur0=ch&&ch.type==='swap'?ch.neu.join(' / '):'';const codes=swapCodes();const isLain=cur0&&!codes.includes(cur0);
+  const me=String(S.staffNo||'').replace(/^0+/,'');
+  const team=teamFor(cur).filter(x=>String(x.id).replace(/^0+/,'')!==me).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const w0=ch&&ch.with||'';const wIn=team.some(x=>`${x.name} (${x.id})`===w0);
+  return `<div class="row" style="flex-direction:column;align-items:stretch;gap:6px">
+  <label class="note" style="margin:0">Shift baru</label>
+  <select id="swSel"><option value="">— Pilih shift —</option>${codes.map(c=>`<option value="${esc(c)}" ${cur0===c?'selected':''}>${esc(c)}${S.times[c]?' ('+tSpan(S.times[c])+')':''}</option>`).join('')}<option value="__lain" ${isLain?'selected':''}>Lain (taip sendiri, cth A2 / B2)</option></select>
+  <input id="swNew" placeholder="Taip shift (cth A2 / B2)" value="${esc(cur0)}" style="display:${isLain?'block':'none'}">
+  <label class="note" style="margin:4px 0 0">Tukar dengan siapa</label>
+  ${team.length?`<select id="swWho"><option value="">— Pilih rakan —</option>${team.map(x=>{const sl=(x.days[d]||[]).join(' / ');return `<option value="${esc(x.name+' ('+x.id+')')}" data-sh="${esc(sl)}" ${w0===x.name+' ('+x.id+')'?'selected':''}>${esc(x.name)} (${esc(x.id)})${sl?' · '+esc(sl):''}</option>`}).join('')}<option value="__lain" ${w0&&!wIn?'selected':''}>Lain (taip nama)</option></select>`:''}
+  <input id="swWith" placeholder="Nama rakan" value="${esc(w0)}" style="display:${team.length&&(wIn||!w0)?'none':'block'}">
+  ${team.length?'<span class="note">Pilih rakan → shift dia hari ni diisi sendiri sebagai shift baru (boleh ubah).</span>':''}</div>`;
+}
+function bindSwap(md){
+  const sel=md.querySelector('#swSel'),inp=md.querySelector('#swNew'),who=md.querySelector('#swWho'),wi=md.querySelector('#swWith');
+  if(sel)sel.onchange=()=>{if(sel.value==='__lain'){inp.style.display='block';inp.focus()}else{inp.style.display='none';inp.value=sel.value}};
+  if(who)who.onchange=()=>{const o=who.selectedOptions[0];if(who.value==='__lain'){wi.style.display='block';wi.value='';wi.focus();return}
+    wi.style.display='none';wi.value=who.value;const sh=(o&&o.dataset.sh||'').trim();
+    if(sh){const codes=swapCodes();const base=sh.toUpperCase();const hit=codes.find(c=>c===base)||codes.find(c=>base.split(' / ').length===1&&base.startsWith(c+' '));
+      if(hit){sel.value=hit;inp.value=hit;inp.style.display='none'}else{sel.value='__lain';inp.value=sh;inp.style.display='block'}}};
+}
 function renderCal(y,m){
   const first=new Date(y,m-1,1).getDay();const n=monthDays(cur);const mo=S.months[cur]||{};
   let g=`<div class="card"><div class="grid">${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'].map(d=>`<div class="dow">${d}</div>`).join('')}`;
@@ -459,7 +484,7 @@ function openDay(d){
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
   <b style="font-size:13px">Tukar shift / Cuti</b>${ch?`<div class="note">Roster asal: <b>${esc(ch.orig.join(' / ')||'-')}</b></div>`:''}
   <div class="seg" style="margin-top:6px">${[['none','Ikut roster'],['swap','Tukar shift'],['AL','AL'],['EL','EL'],['CL','CL'],['MC','MC']].map(([v,l])=>`<label><input type="radio" name="chg" value="${v}" ${(ch?ch.type:'none')===v?'checked':''}>${l}</label>`).join('')}</div>
-  <div id="chSwap" style="margin-top:8px;display:${ch&&ch.type==='swap'?'block':'none'}"><div class="row"><input id="swNew" placeholder="Shift baru (cth B2 atau OFF)" value="${esc(ch&&ch.type==='swap'?ch.neu.join(' / '):'')}" style="flex:1;min-width:140px"><input id="swWith" placeholder="Tukar dengan siapa" value="${esc(ch&&ch.with||'')}" style="flex:1;min-width:140px"></div></div>
+  <div id="chSwap" style="margin-top:8px;display:${ch&&ch.type==='swap'?'block':'none'}">${swapUI(ch,d)}</div>
   <div id="chNote" style="margin-top:8px;display:${ch&&ch.type!=='none'?'block':'none'}"><input id="chN" placeholder="Catatan (sebab / no. rujukan)" value="${esc(ch&&ch.note||'')}" style="width:100%"></div></div>
   <label class="row" style="margin-top:10px"><input type="checkbox" id="dcto" ${r.ctoFlag?'checked':''}> Tuntut CTO hari ni</label>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:${r.shifts.length?'block':'none'}"><b style="font-size:13px">☎ OT dipanggil supervisor</b>
@@ -476,6 +501,7 @@ function openDay(d){
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="dx">Batal</button><button class="btn primary" id="ds">Simpan</button></div></div>`;
   document.body.appendChild(md);
   { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad((h+COVER_H)%24)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill); }
+  bindSwap(md);
   let ctoTouched=false; md.querySelector('#dcto').onchange=()=>{ctoTouched=true};
   md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='dx')md.remove();
@@ -693,6 +719,7 @@ async function syncRoster(pw,id,opts={}){
       else if(me.days[d]&&me.days[d].length) out[d]=me.days[d];
     }
     S.months[k]=out;if(!had)added.push(k);
+    S.team=S.team||{};S.team[k]=data.staff.map(x=>({id:String(x.id),name:x.name,days:x.days}));
     if(opts.login||!S.name)S.name=me.name;S.staffNo=String(me.id);S.line=me.line;
   }
   if(!found)throw new Error('id');
