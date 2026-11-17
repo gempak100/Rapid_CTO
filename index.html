@@ -582,9 +582,10 @@ function buildClaimForm(k){
     const re=new RegExp('<c r="'+ref+'"((?: [a-zA-Z:]+="[^"]*")*)\\s*(?:/>|>[\\s\\S]*?</c>)');
     const m=x.match(re);if(!m){console.warn('sel tiada',ref);return}
     let sAttr=(m[1].match(/ s="\d+"/)||[''])[0];
-    if(v&&v.left){const sn=+(sAttr.match(/\d+/)||[0])[0];const L=FORM_TPL.leftMap&&FORM_TPL.leftMap[sn];if(L!==undefined)sAttr=' s="'+L+'"';v=v.text;}
+    let sz=0;
+    if(v&&typeof v==='object'&&v.text!==undefined){ if(v.left){const sn=+(sAttr.match(/\d+/)||[0])[0];const L=FORM_TPL.leftMap&&FORM_TPL.leftMap[sn];if(L!==undefined)sAttr=' s="'+L+'"';} sz=v.sz||0; v=v.text; }
     const INV='<rPr><sz val="8"/><color rgb="FFFFFFFF"/><rFont val="Tahoma"/><family val="2"/></rPr>',VIS='<rPr><sz val="8"/><color theme="1"/><rFont val="Tahoma"/><family val="2"/></rPr>';
-    const cell=typeof v==='number'?`<c r="${ref}"${sAttr}><v>${v}</v></c>`:v&&v.runs?`<c r="${ref}"${sAttr} t="inlineStr"><is>${v.runs.map(([t,inv])=>`<r>${inv?INV:VIS}<t xml:space="preserve">${xe(t)}</t></r>`).join('')}</is></c>`:`<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+    const cell=typeof v==='number'?`<c r="${ref}"${sAttr}><v>${v}</v></c>`:sz?`<c r="${ref}"${sAttr} t="inlineStr"><is><r><rPr><sz val="${sz}"/><color theme="1"/><rFont val="Tahoma"/><family val="2"/></rPr><t xml:space="preserve">${xe(v)}</t></r></is></c>`:v&&v.runs?`<c r="${ref}"${sAttr} t="inlineStr"><is>${v.runs.map(([t,inv])=>`<r>${inv?INV:VIS}<t xml:space="preserve">${xe(t)}</t></r>`).join('')}</is></c>`:`<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
     x=x.slice(0,m.index)+cell+x.slice(m.index+m[0].length);
   }
   const F=S.form||{};
@@ -600,10 +601,11 @@ function buildClaimForm(k){
   setRich('C3',S.name);setRich('C4',F.depot||'');setRich('C5',F.designation||'');setRich('C6',' '+(F.contact||''));
   setRich('M3',' '+S.staffNo);setRich('M4',F.grade||'');setRich('M5',' '+BULAN_EN[mo-1]+' '+y);
   set('D52',F.superior||' ');set('D53',' ');
-  for(const [d,c] of Object.entries(rows)){const r=13+ +d;for(const [col,v] of Object.entries(c))set(col+r,v);
-    // tinggikan baris bila ada lebih 2 baris tulisan (asal 30pt muat 2 baris)
-    const nl=Math.max(...['B','C','D','H','I'].map(k=>{const v=c[k];if(!v)return 1;const t=v.runs?v.runs.map(x=>x[0]).join(''):v.text!==undefined?v.text:String(v);return t.split('\n').length}));
-    if(nl>2){const ht=Math.max(30,nl*11+6);x=x.replace(new RegExp('(<row r="'+r+'"[^>]*?) ht="[^"]*"'),'$1 ht="'+ht+'"');}
+  for(const [d,c] of Object.entries(rows)){const r=13+ +d;
+    // Saiz petak kekal macam borang asal (30pt muat 2 baris). Kalau lebih 2 baris, kecilkan tulisan petak tu sahaja supaya muat.
+    const lines=k=>{const v=c[k];if(!v)return 1;const t=v.text!==undefined?v.text:String(v);return t.split('\n').length};
+    for(const k of ['B','C','D','H','I']){const n=lines(k);if(n>2){const sz=Math.min(8,Math.floor(28/(n*1.21)*2)/2);c[k]=typeof c[k]==='object'?{...c[k],sz}:{text:c[k],sz};}}
+    for(const [col,v] of Object.entries(c))set(col+r,v);
   }
   for(const [col,v] of Object.entries(T))if(v)set(col+'45',+fh(v));
   const sheet=new TextEncoder().encode(x);
