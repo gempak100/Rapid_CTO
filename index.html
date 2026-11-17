@@ -346,21 +346,17 @@ function renderCal(y,m){
   return g;
 }
 function renderClaim(){
-  const {rows,T}=monthCalc(cur);
+  const {rows,T}=monthCalc(cur);const OTLIM=+S.otLimit||105;
   let h=`<div class="stats">
   <div class="stat"><div class="l">Jumlah elaun</div><div class="v">${rm(T.total)}</div></div>
   <div class="stat"><div class="l">Shift pagi × ${rm(S.rates.pagi)}</div><div class="sub">Total bekerja: <b>${T.nPagi} hari</b></div><div class="v">${rm(T.pagi)}</div></div>
   <div class="stat"><div class="l">Shift petang × ${rm(S.rates.petang)}</div><div class="sub">Total bekerja: <b>${T.nPetang} hari</b></div><div class="v">${rm(T.petang)}</div></div>
   <div class="stat"><div class="l">CTO × ${rm(S.rates.cto)}</div><div class="sub">Total bekerja: <b>${T.nCto} hari</b></div><div class="v">${rm(T.cto)}</div></div>
-  <div class="stat"><div class="l">Jam OT (dah dibuat)</div><div class="sub">Dah dibuat / jumlah</div><div class="v">${fh(T.otDone)} <span class="sub">/ ${fh(T.otTot)} jam</span></div></div>
+  <div class="stat"><div class="l">Jam OT (dah dibuat)</div><div class="sub">Had OT sebulan</div><div class="v" style="color:${T.otDone>=OTLIM?'#c0392b':T.otDone>=OTLIM*0.9?'#d68910':'inherit'}">${fh(T.otDone)} <span class="sub">/ ${fh(OTLIM)} jam</span></div><div style="height:6px;background:var(--line);border-radius:3px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${Math.min(100,T.otDone/OTLIM*100)}%;background:${T.otDone>=OTLIM?'#c0392b':T.otDone>=OTLIM*0.9?'#d68910':'#2e86c1'}"></div></div>${T.otDone>=OTLIM?'<div class="sub" style="color:#c0392b">Dah capai had OT</div>':T.otDone>=OTLIM*0.9?`<div class="sub" style="color:#d68910">Tinggal ${fh(OTLIM-T.otDone)} jam</div>`:''}</div>
   <div class="stat"><div class="l">Kerja hari cuti umum</div><div class="sub">Jumlah</div><div class="v">${T.nPH} <span class="sub">hari</span></div></div></div>`;
   const miss=[...new Set(rows.flatMap(r=>r.missing))];
   if(miss.length)h+=`<div class="warn">Waktu untuk ${miss.join(', ')} belum diisi. Elaun tetap dikira, tapi jam OT tak boleh dikira. Isi di tab Tetapan.</div>`;
-  h+=`<div class="card" style="overflow-x:auto"><table><thead><tr><th>Tarikh</th><th>Shift</th><th>Masa</th><th class="num">Pagi</th><th class="num">Petang</th><th class="num">CTO</th><th class="num">Jam OT</th><th class="num">Jumlah elaun</th></tr></thead><tbody>`;
-  rows.filter(r=>r.shifts.length||r.stby||r.ctoFlag||r.otTot).forEach(r=>{
-    h+=`<tr><td>${r.workPH?'<span class="pill p-hol" title="'+esc(r.holiday)+'">PH</span> ':''}${r.d}/${r.mo} ${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'][new Date(r.y,r.mo-1,r.d).getDay()]}</td><td>${esc(r.raw)}</td><td>${spanText(r)}</td><td class="num">${r.amt.pagi?r.amt.pagi.toFixed(2):''}</td><td class="num">${r.amt.petang?r.amt.petang.toFixed(2):''}</td><td class="num">${r.amt.cto?r.amt.cto.toFixed(2):''}</td><td class="num">${r.otTot?fh(r.otTot):''}</td><td class="num">${r.amt.total.toFixed(2)}</td></tr>`;
-  });
-  h+=`</tbody><tfoot><tr><td colspan="3">Jumlah</td><td class="num">${T.pagi.toFixed(2)}</td><td class="num">${T.petang.toFixed(2)}</td><td class="num">${T.cto.toFixed(2)}</td><td class="num">${fh(T.otTot)}</td><td class="num">${T.total.toFixed(2)}</td></tr></tfoot></table></div>
+  h+=`
   <div class="row"><button class="btn primary" id="dlform">Borang Claim OT (Excel)</button><button class="btn" id="dlc">Ringkasan CSV</button><button class="btn" id="cpy">Salin ringkasan</button></div>
   <p class="note">Borang Claim OT ikut format <i>Application for Overtime / Allowance</i>: waktu kerja ikut masa shift penuh, OT dijumlahkan dalam satu petak, masa lepas tengah malam ditulis 24xx.</p>`;
   return h;
@@ -426,6 +422,7 @@ function renderSettings(){
   <label>Pagi <input type="number" step="0.5" data-rate="pagi" value="${S.rates.pagi}"></label>
   <label>Petang <input type="number" step="0.5" data-rate="petang" value="${S.rates.petang}"></label>
   <label>CTO <input type="number" step="0.5" data-rate="cto" value="${S.rates.cto}"></label>
+  <label>Had OT sebulan (jam) <input type="number" step="1" id="otLimit" value="${+S.otLimit||105}"></label>
   <label class="row"><input type="checkbox" id="ctoAuto" ${S.ctoAuto!==false?'checked':''}> CTO setiap hari kerja (shift asal sahaja)</label>
   <label>Standby <input type="number" step="0.5" data-rate="stby" value="${S.rates.stby}"></label></div></div>`;
   h+=`<div class="card"><b>OT 1 jam setiap shift</b><p class="note">Setiap shift asal direkod OT pada jam terakhir shift tu (contoh A1 0400–1400 → OT 1300–1400). Double shift dan OT tambahan direkod berasingan.</p>
@@ -764,7 +761,7 @@ root.addEventListener('click',e=>{
   else if(t.id==='dlics')dlIcs();
   else if(t.id==='cpyot'){const L=otList(cur);const [yy,mm]=cur.split('-').map(Number);const txt=`Rekod OT ${BULAN[mm-1]} ${yy}\n${S.name} (${S.staffNo})\n`+L.map(o=>`${o.r.d}/${o.r.mo} ${o.kind} ${fmtSpan(o.st,o.en,new Date(o.r.y,o.r.mo-1,o.r.d),'-')} = ${fh(o.h)} jam${o.done?'':' (akan datang)'}`).join('\n')+`\nJumlah: ${fh(L.reduce((a,b)=>a+b.h,0))} jam`;navigator.clipboard.writeText(txt).then(()=>toast('Rekod OT disalin')).catch(()=>toast('Tak dapat salin'))}
   else if(t.id==='saveSet'){
-    root.querySelectorAll('[data-rate]').forEach(i=>S.rates[i.dataset.rate]=parseFloat(i.value)||0);
+    root.querySelectorAll('[data-rate]').forEach(i=>S.rates[i.dataset.rate]=parseFloat(i.value)||0);{const ol=root.querySelector('#otLimit');if(ol)S.otLimit=parseFloat(ol.value)||105;}
     root.querySelectorAll('[data-time]').forEach(i=>{const c=i.dataset.time;S.times[c]=S.times[c]||['',''];S.times[c][+i.dataset.i]=i.value});
     for(const c of Object.keys(S.times))if(!S.times[c][0]&&!S.times[c][1])delete S.times[c];
     S.claimHour={on:document.getElementById('chOn').checked,jam:parseFloat(document.getElementById('chJam').value)||0,swap:document.getElementById('chSw').checked};
