@@ -194,7 +194,7 @@ function dayCalc(k,d){
   const s0=spans.length?Math.min(...spans.map(x=>+x[0])):0,s1=spans.length?Math.max(...spans.map(x=>+x[1])):0;
   man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:m.type==='ops'?(spans.length&&+m.en<=s0?'Ops Req (masuk awal)':spans.length&&+m.st>=s1?'Ops Req (balik lewat)':'Ops Requirement'):(MAN_KIND[m.type]||'OT tambahan'),mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
-  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover')continue; if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
+  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover'||o.mtype==='ops')continue; /* ops req: permintaan management, boleh lebih 9 jam */ if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0&&!ot[i].full) ot.splice(i,1);
     jamH=ot.filter(o=>o.kind==='1 jam shift').reduce((a,b)=>a+b.h,0); if(!jamH)jamWin=null;
     otH=ot.filter(o=>o.kind==='Double shift').reduce((a,b)=>a+b.h,0);
