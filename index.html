@@ -366,16 +366,15 @@ function otList(k){
   rows.forEach(r=>r.ot.forEach(o=>out.push({...o,r})));return out;
 }
 function renderOT(){
-  const L=otList(cur);const tot=L.reduce((a,b)=>a+b.h,0),done=L.filter(o=>o.done).reduce((a,b)=>a+b.h,0);
+  const L=otList(cur).filter(o=>o.kind!=='1 jam shift'); /* excess 1 jam wajib setiap duty: tak dipapar */const tot=L.reduce((a,b)=>a+b.h,0),done=L.filter(o=>o.done).reduce((a,b)=>a+b.h,0);
   const by=k=>L.filter(o=>o.kind===k).reduce((a,b)=>a+b.h,0);
   let h=`<div class="stats">
   <div class="stat"><div class="l">Jam OT dah dibuat</div><div class="v">${fh(done)} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">Akan datang (ikut roster)</div><div class="v">${fh(tot-done)} <span class="sub">jam</span></div></div>
-  <div class="stat"><div class="l">1 jam setiap shift</div><div class="v">${fh(by('1 jam shift'))}</div></div>
   <div class="stat"><div class="l">Double shift</div><div class="v">${fh(by('Double shift'))}</div></div>
   <div class="stat"><div class="l">OT tambahan / Ops Req</div><div class="v">${fh(L.filter(o=>o.mtype==='ot'||o.mtype==='ops').reduce((a,b)=>a+b.h,0))}</div></div>
   <div class="stat"><div class="l">Meal break / OT cover meal break</div><div class="v">${fh(by('Meal break')+by('OT Cover Meal Break'))}</div></div></div>`;
-  h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">1 jam setiap shift dan double shift dikira sendiri dari roster. Untuk OT lain (balik lewat, dipanggil masuk), meal break atau cover meal, tekan hari dalam Kalendar, atau guna butang <b>+ Meal break</b> di atas bila sedang bertugas.</p>
+  h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">Double shift dikira sendiri dari roster. Excess 1 jam (wajib setiap duty) tak dipapar, tapi tetap masuk borang claim. Untuk OT lain (balik lewat, dipanggil masuk), meal break atau cover meal, tekan hari dalam Kalendar, atau guna butang <b>+ Meal break</b> di atas bila sedang bertugas.</p>
   <table><thead><tr><th>Tarikh</th><th>Jenis</th><th>Masa</th><th>Catatan</th><th class="num">Jam</th><th>Status</th></tr></thead><tbody>`;
   L.forEach(o=>{const r=o.r;h+=`<tr><td>${r.d}/${r.mo} ${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'][new Date(r.y,r.mo-1,r.d).getDay()]}</td><td><span class="pill ${o.mtype==='ot'?'p-ev':o.mtype?'p-leave':o.kind==='Double shift'?'p-ot':'p-petang'}">${o.kind}</span></td><td>${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</td><td>${esc(o.note)}${o.full?` <span class="note">(dikira ${fh(o.h)} daripada ${fh(o.full)} jam, had 9 jam OT)</span>`:''}</td><td class="num">${fh(o.h)}</td><td>${o.done?'<span class="pill p-stby">✓ Dah buat</span>':'<span class="pill p-off">Akan datang</span>'}</td></tr>`});
   if(!L.length)h+=`<tr><td colspan="6" class="note">Tiada OT bulan ni.</td></tr>`;
@@ -759,7 +758,7 @@ root.addEventListener('click',e=>{
   else if(t.id==='rsOut'){if(confirm('Tukar pengguna? Simpan backup dulu kalau perlu. Data dalam phone ni akan dikosongkan.')){try{localStorage.removeItem(LS_KEY)}catch(e){};const keep={holidays:S.holidays,events:S.events};S=JSON.parse(JSON.stringify(BASE));Object.assign(S,keep);view='login';render();}}
   else if(t.id==='bkSave')saveBackup();
   else if(t.id==='dlics')dlIcs();
-  else if(t.id==='cpyot'){const L=otList(cur);const [yy,mm]=cur.split('-').map(Number);const txt=`Rekod OT ${BULAN[mm-1]} ${yy}\n${S.name} (${S.staffNo})\n`+L.map(o=>`${o.r.d}/${o.r.mo} ${o.kind} ${fmtSpan(o.st,o.en,new Date(o.r.y,o.r.mo-1,o.r.d),'-')} = ${fh(o.h)} jam${o.done?'':' (akan datang)'}`).join('\n')+`\nJumlah: ${fh(L.reduce((a,b)=>a+b.h,0))} jam`;navigator.clipboard.writeText(txt).then(()=>toast('Rekod OT disalin')).catch(()=>toast('Tak dapat salin'))}
+  else if(t.id==='cpyot'){const L=otList(cur).filter(o=>o.kind!=='1 jam shift');const [yy,mm]=cur.split('-').map(Number);const txt=`Rekod OT ${BULAN[mm-1]} ${yy}\n${S.name} (${S.staffNo})\n`+L.map(o=>`${o.r.d}/${o.r.mo} ${o.kind} ${fmtSpan(o.st,o.en,new Date(o.r.y,o.r.mo-1,o.r.d),'-')} = ${fh(o.h)} jam${o.done?'':' (akan datang)'}`).join('\n')+`\nJumlah: ${fh(L.reduce((a,b)=>a+b.h,0))} jam`;navigator.clipboard.writeText(txt).then(()=>toast('Rekod OT disalin')).catch(()=>toast('Tak dapat salin'))}
   else if(t.id==='saveSet'){
     root.querySelectorAll('[data-rate]').forEach(i=>S.rates[i.dataset.rate]=parseFloat(i.value)||0);{const ol=root.querySelector('#otLimit');if(ol)S.otLimit=parseFloat(ol.value)||105;}
     root.querySelectorAll('[data-time]').forEach(i=>{const c=i.dataset.time;S.times[c]=S.times[c]||['',''];S.times[c][+i.dataset.i]=i.value});
