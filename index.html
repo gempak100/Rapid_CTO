@@ -408,7 +408,7 @@ function renderClaim(){
   const miss=[...new Set(rows.flatMap(r=>r.missing))];
   if(miss.length)h+=`<div class="warn">Waktu untuk ${miss.join(', ')} belum diisi. Elaun tetap dikira, tapi jam OT tak boleh dikira. Isi di tab Tetapan.</div>`;
   h+=`
-  <div class="row"><button class="btn primary" id="dlform">Cetak Tugasan Harian</button><button class="btn" id="dlc">Ringkasan CSV</button><button class="btn" id="cpy">Salin ringkasan</button></div>
+  <div class="row"><button class="btn primary" id="dlform">Cetak Tugasan Harian</button></div>
   <p class="note">Borang Claim OT ikut format <i>Application for Overtime / Allowance</i>: waktu kerja ikut masa shift penuh, OT dijumlahkan dalam satu petak, masa lepas tengah malam ditulis 24xx.</p>`;
   return h;
 }
