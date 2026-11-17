@@ -105,6 +105,7 @@ try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if
 S.changes = S.changes || {}; S.otManual = S.otManual || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
 const LEAVES=['AL','EL','CL','MC'];const LEAVE_NAME={AL:'Cuti Tahunan',EL:'Cuti Kecemasan',CL:'Compassionate Leave',MC:'Cuti Sakit (MC)',swap:'Tukar shift'};
 const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'OT Cover Meal Break'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL'};
+const COVER_H=4; // OT cover meal biasanya 4 jam
 const OT_MAX=9; // OT maksimum 9 jam sehari (1 jam excess duty asal dikira berasingan)
 function isPagi(c){c=String(c);if(c.startsWith('BTS'))return c==='BTS A';return c[0]==='A'}
 S.holidays = S.holidays || BASE.holidays || {}; S.events = S.events || BASE.events || [];
@@ -251,11 +252,12 @@ function activeDay(){
 function openQuick(type){
   const ad=activeDay();if(!ad)return;
   const md=document.createElement('div');md.className='modal';
-  md.innerHTML=`<div class="card"><b>${MAN_KIND[type]} · ${ad.d}/${ad.m}</b><p class="note">Masukkan masa yang supervisor bagi.${type==='ot'?'':' Tidak dikira dalam had 9 jam OT.'}</p>
+  md.innerHTML=`<div class="card"><b>${MAN_KIND[type]} · ${ad.d}/${ad.m}</b><p class="note">Masukkan masa yang supervisor bagi.${type==='cover'?' Biasanya 4 jam: isi masa mula, masa tamat diisi sendiri.':''}${type==='ot'?'':' Tidak dikira dalam had 9 jam OT.'}</p>
   <div class="row"><input id="qS" type="time" style="width:120px"><span>–</span><input id="qE" type="time" style="width:120px"></div>
   <input id="qN" placeholder="Catatan (pilihan)" style="width:100%;margin-top:8px">
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="qX">Batal</button><button class="btn primary" id="qG">Simpan</button></div></div>`;
   document.body.appendChild(md);
+  if(type==='cover'){const qs=md.querySelector('#qS'),qe=md.querySelector('#qE');qs.addEventListener('change',()=>{if(qs.value){const [h,mi]=qs.value.split(':').map(Number);qe.value=pad((h+COVER_H)%24)+':'+pad(mi);}});}
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='qX')md.remove()});
   md.querySelector('#qG').onclick=()=>{const a=md.querySelector('#qS').value,b=md.querySelector('#qE').value;if(!a||!b){toast('Isi masa mula dan tamat');return}
     const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#qN').value.trim(),type});md.remove();render();save(MAN_KIND[type]+' disimpan');};
@@ -445,6 +447,7 @@ function openDay(d){
   <div class="row" style="margin-top:10px">${links}</div>
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="dx">Batal</button><button class="btn primary" id="ds">Simpan</button></div></div>`;
   document.body.appendChild(md);
+  { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad((h+COVER_H)%24)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill); }
   let ctoTouched=false; md.querySelector('#dcto').onchange=()=>{ctoTouched=true};
   md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='dx')md.remove();
@@ -541,10 +544,10 @@ function formRows(k){
     const manLine=o=>'*'+(o.mtype==='ot'?(o.note||'OT').toUpperCase():MAN_LINE[o.mtype]);
     const T4=dt=>hhmm(dt,y,mo,d);
     if(r.shifts.length){
-      lines.push(r.shifts.length>1?`${r.shifts[0]}/OT ${r.shifts.slice(1).join('/')} *Excess Working`:`${r.shifts[0]} *Excess Working`);
+      { const parts=[r.shifts[0],...r.shifts.slice(1).map(x=>'OT '+x)]; if(man.some(o=>o.mtype==='cover'))parts.push('OT Cover Meal'); lines.push(parts.join('/')+' *Excess Working'); }
       if(ch&&ch.type==='swap')lines.push(`*SWAP${ch.with?' '+ch.with.toUpperCase():''} (ASAL ${ch.orig.join('/')})`);
       if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
-      man.forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
+      man.filter(o=>o.mtype!=='cover').forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
       const st=r.spans[0]?r.spans[0][0]:null;
       if(st){c.C=T4(st);c.D=T4(r.spans[0][1]);}
       if(r.holiday)c.G=1;else c.E=1;
