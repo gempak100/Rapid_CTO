@@ -809,7 +809,7 @@ async function doLogin(){
 }
 async function autoSync(){
   const pw=teamPw();if(!pw||!S.staffNo||!navigator.onLine)return;
-  try{const added=await syncRoster(pw,S.staffNo);if(added.length){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster baru: '+added.map(k=>{const [yy,mm]=k.split('-').map(Number);return BULAN[mm-1]+' '+yy}).join(', '))}else{try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render()}}catch(e){}
+  try{const before=JSON.stringify([S.months,S.team]);const added=await syncRoster(pw,S.staffNo);if(!added.length&&JSON.stringify([S.months,S.team])!==before){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster dikemas kini');}if(added.length){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster baru: '+added.map(k=>{const [yy,mm]=k.split('-').map(Number);return BULAN[mm-1]+' '+yy}).join(', '))}else{try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render()}}catch(e){}
 }
 function fillRoster(){
   const mv=document.getElementById('rMonth').value;const msg=document.getElementById('rosterMsg');
