@@ -174,21 +174,21 @@ function dayCalc(k,d){
   if(p.shifts.length>1&&spans.length===p.shifts.length){
     const o=spans[0];const parts=[];
     for(const sp of spans.slice(1)){
-      if(sp[0]<o[0])parts.push([sp[0],new Date(Math.min(+sp[1],+o[0]))]);
-      if(sp[1]>o[1])parts.push([new Date(Math.max(+sp[0],+o[1])),sp[1]]);
+      if(sp[0]<o[0])parts.push([sp[0],new Date(Math.min(+sp[1],+o[0])),true]);
+      if(sp[1]>o[1])parts.push([new Date(Math.max(+sp[0],+o[1])),sp[1],false]);
     }
     parts.sort((a,b)=>a[0]-b[0]);
-    for(const pt of parts){const last=dsWins[dsWins.length-1];if(last&&pt[0]<=last[1]){if(pt[1]>last[1])last[1]=pt[1];}else dsWins.push([pt[0],pt[1]]);}
+    for(const pt of parts){const last=dsWins[dsWins.length-1];if(last&&pt[0]<=last[1]&&last[2]===pt[2]){if(pt[1]>last[1])last[1]=pt[1];}else dsWins.push([pt[0],pt[1],pt[2]]);}
     otH=dsWins.reduce((a,w)=>a+(w[1]-w[0])/3600000,0);
   }
   const man=(S.otManual[dkey(y,mo,d)]||[]).map((e,i)=>{const st=new Date(y,mo-1,d,...e.start.split(':').map(Number));let en=new Date(y,mo-1,d,...e.end.split(':').map(Number));if(en<=st)en=new Date(+en+86400000);return {i,st,en,h:(en-st)/3600000,note:e.note||''}});
   let manH=man.reduce((a,b)=>a+b.h,0);
   const ot=[];
   if(jamWin)ot.push({kind:'1 jam shift',st:jamWin[0],en:jamWin[1],h:jamH,note:p.shifts[0]+(swapped?' (tukar)':'')});
-  dsWins.forEach(w=>ot.push({kind:'Double shift',st:w[0],en:w[1],h:(w[1]-w[0])/3600000,note:p.shifts.join(' + ')}));
+  dsWins.forEach(w=>ot.push({kind:'Double shift',st:w[0],en:w[1],pre:w[2],h:(w[1]-w[0])/3600000,note:p.shifts.join(' + ')}));
   man.forEach(m=>ot.push({kind:'OT tambahan',st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
-  // Had sehari: OT maksimum 9 jam (potong dari hujung) + 1 jam excess duty asal
-  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift')continue; if(o.h>left){o.h=Math.max(0,left);o.en=new Date(+o.st+o.h*3600000);} left-=o.h; }
+  // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
+  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift')continue; if(o.h>left){o.h=Math.max(0,left);if(o.pre)o.st=new Date(+o.en-o.h*3600000);else o.en=new Date(+o.st+o.h*3600000);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0) ot.splice(i,1);
     jamH=ot.filter(o=>o.kind==='1 jam shift').reduce((a,b)=>a+b.h,0); if(!jamH)jamWin=null;
     otH=ot.filter(o=>o.kind==='Double shift').reduce((a,b)=>a+b.h,0);
