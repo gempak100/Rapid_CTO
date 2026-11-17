@@ -191,7 +191,8 @@ function dayCalc(k,d){
   const ot=[];
   if(jamWin)ot.push({kind:'1 jam shift',st:jamWin[0],en:jamWin[1],h:jamH,note:p.shifts[0]+(swapped?' (tukar)':'')});
   dsWins.forEach(w=>ot.push({kind:'Double shift',st:w[0],en:w[1],pre:w[2],h:(w[1]-w[0])/3600000,note:p.shifts.join(' + ')}));
-  man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:MAN_KIND[m.type]||'OT tambahan',mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
+  const s0=spans.length?Math.min(...spans.map(x=>+x[0])):0,s1=spans.length?Math.max(...spans.map(x=>+x[1])):0;
+  man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:m.type==='ops'?(spans.length&&+m.en<=s0?'Ops Req (masuk awal)':spans.length&&+m.st>=s1?'Ops Req (balik lewat)':'Ops Requirement'):(MAN_KIND[m.type]||'OT tambahan'),mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
   { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover')continue; if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0&&!ot[i].full) ot.splice(i,1);
@@ -249,8 +250,29 @@ function activeDay(){
     if(off===0||(nw>=st&&nw<=en+3*3600000))return {k,d:dt.getDate(),m:dt.getMonth()+1,y:dt.getFullYear(),r};}
   return null;
 }
+function hm(dt){return pad(dt.getHours())+':'+pad(dt.getMinutes())}
+function openOps(ad){
+  const st=new Date(Math.min(...ad.r.spans.map(x=>+x[0]))),en=new Date(Math.max(...ad.r.spans.map(x=>+x[1])));
+  const md=document.createElement('div');md.className='modal';
+  md.innerHTML=`<div class="card"><b>Ops Requirement · ${ad.d}/${ad.m}</b><p class="note">Duty ${esc(ad.r.raw)}: ${hhmm(st,ad.y,ad.m,ad.d)}–${hhmm(en,ad.y,ad.m,ad.d)}</p>
+  <div class="seg"><label><input type="radio" name="opsM" value="awal">Masuk awal</label><label><input type="radio" name="opsM" value="lewat" checked>Balik lewat</label></div>
+  <div id="opsAwal" style="display:none;margin-top:10px"><label>Masa lapor diri<br><input id="opsA" type="time" style="width:140px"></label><div class="note">OT dari masa lapor hingga duty mula (${hhmm(st,ad.y,ad.m,ad.d)}).</div></div>
+  <div id="opsLewat" style="margin-top:10px"><label>Masa sign off sebenar<br><input id="opsL" type="time" style="width:140px"></label><div class="note">OT dari duty habis (${hhmm(en,ad.y,ad.m,ad.d)}) hingga masa sign off.</div></div>
+  <input id="opsN" placeholder="Sebab / event (cth KL RUN, Konsert)" style="width:100%;margin-top:10px">
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="qX">Batal</button><button class="btn primary" id="qG">Simpan</button></div></div>`;
+  document.body.appendChild(md);
+  md.querySelectorAll('input[name=opsM]').forEach(i=>i.onchange=()=>{const aw=i.value==='awal'&&i.checked;md.querySelector('#opsAwal').style.display=aw?'block':'none';md.querySelector('#opsLewat').style.display=aw?'none':'block';});
+  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='qX')md.remove()});
+  md.querySelector('#qG').onclick=()=>{
+    const mode=md.querySelector('input[name=opsM]:checked').value;let a,b;
+    if(mode==='awal'){a=md.querySelector('#opsA').value;b=hm(st);if(!a){toast('Isi masa lapor diri');return}}
+    else{a=hm(en);b=md.querySelector('#opsL').value;if(!b){toast('Isi masa sign off');return}}
+    const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#opsN').value.trim(),type:'ops',mode});md.remove();render();save('Ops Requirement disimpan ('+(mode==='awal'?'masuk awal':'balik lewat')+')');
+  };
+}
 function openQuick(type){
   const ad=activeDay();if(!ad)return;
+  if(type==='ops'){openOps(ad);return}
   const md=document.createElement('div');md.className='modal';
   md.innerHTML=`<div class="card"><b>${MAN_KIND[type]} · ${ad.d}/${ad.m}</b><p class="note">Masukkan masa yang supervisor bagi.${type==='cover'?' Biasanya 4 jam: isi masa mula, masa tamat diisi sendiri.':''}${type==='ops'?' Contoh: duty habis 0130, sambung untuk event 0130–0300. Catatan (cth nama event) akan ditulis dalam kurungan.':''}${type==='ot'?'':' Tidak dikira dalam had 9 jam OT.'}</p>
   <div class="row"><input id="qS" type="time" style="width:120px"><span>–</span><input id="qE" type="time" style="width:120px"></div>
@@ -348,7 +370,7 @@ function renderOT(){
   <div class="stat"><div class="l">Akan datang (ikut roster)</div><div class="v">${fh(tot-done)} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">1 jam setiap shift</div><div class="v">${fh(by('1 jam shift'))}</div></div>
   <div class="stat"><div class="l">Double shift</div><div class="v">${fh(by('Double shift'))}</div></div>
-  <div class="stat"><div class="l">OT tambahan</div><div class="v">${fh(by('OT tambahan'))}</div></div>
+  <div class="stat"><div class="l">OT tambahan / Ops Req</div><div class="v">${fh(L.filter(o=>o.mtype==='ot'||o.mtype==='ops').reduce((a,b)=>a+b.h,0))}</div></div>
   <div class="stat"><div class="l">Meal break / OT cover meal break</div><div class="v">${fh(by('Meal break')+by('OT Cover Meal Break'))}</div></div></div>`;
   h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">1 jam setiap shift dan double shift dikira sendiri dari roster. Untuk OT lain (balik lewat, dipanggil masuk), meal break atau cover meal, tekan hari dalam Kalendar, atau guna butang <b>+ Meal break</b> di atas bila sedang bertugas.</p>
   <table><thead><tr><th>Tarikh</th><th>Jenis</th><th>Masa</th><th>Catatan</th><th class="num">Jam</th><th>Status</th></tr></thead><tbody>`;
