@@ -528,6 +528,7 @@ function zipWrite(files){ // files: [{n, m, c, u, data}]
 function hhmm(dt,y,mo,d){const base=new Date(y,mo-1,d);const mins=Math.round((dt-base)/60000);return pad(Math.floor(mins/60))+pad(mins%60)}
 // Lebar huruf Tahoma (per em) untuk susun baris keterangan supaya * sebaris
 const TAHOMA={' ':.313,'*':.546,'/':.382,'(':.383,')':.383,'-':.363,'.':.312,"'":.267,A:.601,B:.589,C:.601,D:.678,E:.561,F:.521,G:.667,H:.693,I:.372,J:.417,K:.597,L:.525,M:.787,N:.705,O:.708,P:.551,Q:.708,R:.623,S:.562,T:.584,U:.676,V:.6,W:.885,X:.578,Y:.576,Z:.559,a:.525,b:.553,c:.461,d:.553,e:.526,f:.318,g:.546,h:.558,i:.229,j:.282,k:.498,l:.229,m:.84,n:.558,o:.543,p:.553,q:.553,r:.36,s:.446,t:.334,u:.558,v:.498,w:.742,x:.499,y:.498,z:.444};
+function fillW(w){const opts=['W','M','H','n','e','s','r','i'];let out='';let left=w;for(const ch of opts){const cw=TAHOMA[ch];while(left>=cw-0.04){out+=ch;left-=cw;}}return out}
 function tw(t){let w=0;for(const ch of String(t))w+=TAHOMA[ch]!==undefined?TAHOMA[ch]:(/[0-9]/.test(ch)?.546:.55);return w}
 function formRows(k){
   const [y,mo]=k.split('-').map(Number);const n=monthDays(k);const rows={};
@@ -563,10 +564,13 @@ function formRows(k){
     const shiftRM=r.amt.pagi+r.amt.petang;if(shiftRM)c.M=shiftRM;
     if(r.amt.cto)c.R=r.amt.cto;if(r.amt.stby)c.Q=r.amt.stby;
     if(lines.length>1&&/ \*Excess Working$/.test(lines[0])){
-      const code=lines[0].replace(/\*Excess Working$/,'');const W1=tw(lines[0]),wc=tw(code),sp=tw(' ');
-      for(let i=1;i<lines.length;i++){const P=Math.round((tw(lines[i])-W1+2*wc)/sp);lines[i]=P>=0?' '.repeat(P)+lines[i]:lines[i]+' '.repeat(-P);}
-    }
-    c.B=lines.join('\n');
+      // Susun atas-bawah: baris tambahan bermula tepat bawah "*Excess Working".
+      // Kod shift diulang dalam tulisan putih (tak nampak) supaya lebarnya sama tepat; ekor putih menyamakan panjang baris untuk cell tengah.
+      const code=lines[0].replace(/\*Excess Working$/,'');const T=[lines[0].slice(code.length),...lines.slice(1)];
+      const mx=Math.max(...T.map(tw));const runs=[];
+      T.forEach((t,i)=>{ if(i===0)runs.push([code+t,0]); else {runs.push(['\n',0]);runs.push([code,1]);runs.push([t,0]);} const tail=fillW(mx-tw(t)); if(tail)runs.push([tail,1]); });
+      c.B={runs};
+    } else c.B=lines.join('\n');
     for(const x in T)if(typeof c[x]==='number')T[x]+=c[x];
     rows[d]=c;
   }
@@ -581,7 +585,8 @@ function buildClaimForm(k){
     const re=new RegExp('<c r="'+ref+'"((?: [a-zA-Z:]+="[^"]*")*)\\s*(?:/>|>[\\s\\S]*?</c>)');
     const m=x.match(re);if(!m){console.warn('sel tiada',ref);return}
     const sAttr=(m[1].match(/ s="\d+"/)||[''])[0];
-    const cell=typeof v==='number'?`<c r="${ref}"${sAttr}><v>${v}</v></c>`:`<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+    const INV='<rPr><sz val="8"/><color rgb="FFFFFFFF"/><rFont val="Tahoma"/><family val="2"/></rPr>',VIS='<rPr><sz val="8"/><color theme="1"/><rFont val="Tahoma"/><family val="2"/></rPr>';
+    const cell=typeof v==='number'?`<c r="${ref}"${sAttr}><v>${v}</v></c>`:v&&v.runs?`<c r="${ref}"${sAttr} t="inlineStr"><is>${v.runs.map(([t,inv])=>`<r>${inv?INV:VIS}<t xml:space="preserve">${xe(t)}</t></r>`).join('')}</is></c>`:`<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
     x=x.slice(0,m.index)+cell+x.slice(m.index+m[0].length);
   }
   const F=S.form||{};
