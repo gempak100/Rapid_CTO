@@ -104,7 +104,7 @@ try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if
 
 S.changes = S.changes || {}; S.otManual = S.otManual || {}; S.otDuty = S.otDuty || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
 const LEAVES=['AL','EL','CL','MC'];const LEAVE_NAME={AL:'Cuti Tahunan',EL:'Cuti Kecemasan',CL:'Compassionate Leave',MC:'Cuti Sakit (MC)',swap:'Tukar shift'};
-const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'OT Cover Meal Break',ops:'Ops Requirement'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL',ops:'OPS REQ'};
+const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'OT Cover Meal Break',ops:'Ops Requirement',signoff:'Exceed sign off'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL',ops:'OPS REQ',signoff:'EXCEED SIGN OFF'};
 const COVER_H=4; // OT cover meal biasanya 4 jam
 const OT_MAX=9; // OT maksimum 9 jam sehari (1 jam excess duty asal dikira berasingan)
 function isPagi(c){c=String(c);if(c.startsWith('BTS'))return c==='BTS A';return c[0]==='A'}
@@ -209,7 +209,7 @@ function dayCalc(k,d){
   man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:m.type==='ops'?(spans.length&&+m.en<=s0?'Ops Req (masuk awal)':spans.length&&+m.st>=s1?'Ops Req (balik lewat)':'Ops Requirement'):(MAN_KIND[m.type]||'OT tambahan'),mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   if(p.offOT){const sp=shiftSpan(p.offOT,y,mo,d);if(sp){p.offSpan=sp;if(!p.restOT)ot.push({kind:'OT dipanggil (OFF)',st:sp[0],en:sp[1],h:(sp[1]-sp[0])/3600000,note:p.offOT});}}
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
-  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover'||o.mtype==='ops')continue; /* ops req: permintaan management, boleh lebih 9 jam */ if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
+  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover'||o.mtype==='ops'||o.mtype==='signoff')continue; /* ops req: permintaan management, boleh lebih 9 jam */ if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0&&!ot[i].full) ot.splice(i,1);
     jamH=ot.filter(o=>o.kind==='1 jam shift').reduce((a,b)=>a+b.h,0); if(!jamH)jamWin=null;
     otH=ot.filter(o=>o.kind==='Double shift').reduce((a,b)=>a+b.h,0);
@@ -313,9 +313,23 @@ function openOps(ad){
     const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#opsN').value.trim(),type:'ops',mode});md.remove();render();save('Ops Requirement disimpan ('+(mode==='awal'?'masuk awal':'balik lewat')+')');
   };
 }
+function openSignoff(ad){
+  const sp=ad.r.spans;if(!sp.length)return;const en=new Date(Math.max(...sp.map(x=>+x[1])));
+  const md=document.createElement('div');md.className='modal';
+  md.innerHTML=`<div class="card"><b>Exceed sign off · ${ad.d}/${ad.m}</b><p class="note">Duty ${esc(ad.r.raw)} habis ${hhmm(en,ad.y,ad.m,ad.d)}. Isi masa sign off sebenar — beza masa diclaim (cth 30 minit = 0.5 jam).</p>
+  <label>Masa sign off sebenar<br>${t24in('soT',ad.r,'after',140)}</label>
+  <input id="soN" placeholder="Sebab (pilihan)" style="width:100%;margin-top:10px">
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="qX">Batal</button><button class="btn primary" id="qG">Simpan</button></div></div>`;
+  document.body.appendChild(md);
+  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='qX')md.remove()});
+  md.querySelector('#qG').onclick=()=>{const b=md.querySelector('#soT').value;if(!b){toast('Isi masa sign off');return}
+    const a=hhmm(en,ad.y,ad.m,ad.d).replace(/(\d\d)$/,':$1');const key=dkey(ad.y,ad.m,ad.d);
+    (S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#soN').value.trim(),type:'signoff'});md.remove();render();save('Exceed sign off disimpan');};
+}
 function openQuick(type){
   const ad=activeDay();if(!ad)return;
   if(type==='ops'){openOps(ad);return}
+  if(type==='signoff'){openSignoff(ad);return}
   const md=document.createElement('div');md.className='modal';
   md.innerHTML=`<div class="card"><b>${MAN_KIND[type]} · ${ad.d}/${ad.m}</b><p class="note">Masukkan masa yang supervisor bagi.${type==='cover'?' Biasanya 4 jam: isi masa mula, masa tamat diisi sendiri.':''}${type==='ops'?' Contoh: duty habis 0130, sambung untuk event 0130–0300. Catatan (cth nama event) akan ditulis dalam kurungan.':''}${type==='ot'?'':' Tidak dikira dalam had 9 jam OT.'}</p>
   <div class="row">${t24in('qS',ad.r,'',120)}<span>–</span>${t24in('qE',ad.r,'',120)}</div>
@@ -335,7 +349,7 @@ function render(){
   const up=upcoming();
   if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
   const ad=activeDay();
-  if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button>${ad.r.shifts.length>1?'':'<button class="btn" data-quick="cover">+ OT Cover Meal Break</button>'}<button class="btn" data-quick="ops">+ Ops Req</button></span></div>`;
+  if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button>${ad.r.shifts.length>1?'':'<button class="btn" data-quick="cover">+ OT Cover Meal Break</button>'}<button class="btn" data-quick="ops">+ Ops Req</button><button class="btn" data-quick="signoff">+ Exceed sign off</button></span></div>`;
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
   if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni. Isi roster di tab Tetapan.</div>`; h+=renderCal(y,m); }
   else if(view==='claim') h+= S.months[cur] ? renderClaim() : `<div class="card">Belum ada roster untuk bulan ni.</div>`;
@@ -385,6 +399,7 @@ function renderCal(y,m){
       if(r.ctoFlag!==r.ctoDefault)inner+=`<div class="code p-ot">${r.ctoFlag?'+ CTO':'tiada CTO'}</div>`;
       if(r.spans.length)inner+=`<div class="t">${spanText(r)}</div>`;
       if(r.called)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc(r.called)}</div>`;
+      r.ot.filter(o=>o.mtype==='signoff').forEach(o=>{inner+=`<div class="code p-ev" title="Exceed sign off${o.note?' · '+esc(o.note):''}">⏱ Sign off ${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='ops').forEach(o=>{const aw=/awal/.test(o.kind);inner+=`<div class="code p-ev" title="${esc(o.kind)}${o.note?' · '+esc(o.note):''}">⚑ OPS ${aw?'awal':'lewat'}</div>`});
       const ch=S.changes[dkey(y,m,d)];if(ch&&ch.type==='swap')inner+=`<div class="code p-swap" title="Asal: ${esc(ch.orig.join(' / '))}">⇄ tukar</div>`;
     }
@@ -438,7 +453,8 @@ function renderOT(){
   <div class="stat"><div class="l">Double shift</div><div class="v">${fh(by('Double shift'))} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">Meal break</div><div class="v">${fh(L.filter(o=>o.mtype==='meal').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">OT Cover Meal</div><div class="v">${fh(L.filter(o=>o.mtype==='cover').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div>
-  <div class="stat"><div class="l">Ops Requirement</div><div class="v">${fh(L.filter(o=>o.mtype==='ops').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div></div>`;
+  <div class="stat"><div class="l">Ops Requirement</div><div class="v">${fh(L.filter(o=>o.mtype==='ops').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div>
+  <div class="stat"><div class="l">Exceed sign off</div><div class="v">${fh(L.filter(o=>o.mtype==='signoff').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div></div>`;
   h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">Double shift dikira sendiri dari roster. Excess Working 1 jam setiap duty juga direkod di sini. Untuk meal break, OT cover meal atau ops requirement, tekan hari dalam Kalendar, atau guna butang cepat di atas bila sedang bertugas.</p>
   <table><thead><tr><th>Tarikh</th><th>Jenis</th><th>Masa</th><th>Catatan</th><th class="num">Jam</th><th>Status</th></tr></thead><tbody>`;
   /* hari double shift: excess duty asal + double shift digabung satu baris */
@@ -531,14 +547,15 @@ function openDay(d){
   <span class="note">${(S.months[cur]||{})[d]&&parseDay((S.months[cur]||{})[d]).shifts.length>1?'Hari ni dah double shift dalam roster.':'Pilih duty OT yang supervisor minta.'}</span></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Meal break / OT Cover Meal / Ops Requirement</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind==='1 jam shift'?'Excess Working':o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
   ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
-  <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
+  <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option><option value="signoff">Exceed sign off</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
+  <div id="otSOBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="row"><span class="note">Masa sign off sebenar</span>${t24in('otSO',r,'after',110)}<span class="note">Claim dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Hanya untuk hari bertugas.</div>'}</div>
   <div id="otOpsBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="seg"><label><input type="radio" name="otOpsM" value="awal">Masuk awal</label><label><input type="radio" name="otOpsM" value="lewat" checked>Balik lewat</label></div>
   <div class="row" style="margin-top:6px"><span id="otOpsL" class="note">Masa sign off sebenar</span>${t24in('otOps',r,'after',110)}<span id="otOpsH" class="note">OT dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Ops Requirement hanya untuk hari bertugas.</div>'}</div></div>
   <div class="row" style="margin-top:10px">${links}</div>
   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="dx">Batal</button><button class="btn primary" id="ds">Simpan</button></div></div>`;
   document.body.appendChild(md);
   { const ts=md.querySelector('#otT'),os=md.querySelector('#otS'),oe=md.querySelector('#otE'); const fill=()=>{if(ts.value==='cover'&&os.value){const [h,mi]=os.value.split(':').map(Number);oe.value=pad(h+COVER_H)+':'+pad(mi);}}; ts.addEventListener('change',fill); os.addEventListener('change',fill);
-    const opsUI=()=>{const on=ts.value==='ops';md.querySelector('#otSE').style.display=on?'none':'';md.querySelector('#otOpsBox').style.display=on?'block':'none';};ts.addEventListener('change',opsUI);
+    const opsUI=()=>{const on=ts.value==='ops',so=ts.value==='signoff';md.querySelector('#otSE').style.display=(on||so)?'none':'';md.querySelector('#otOpsBox').style.display=on?'block':'none';md.querySelector('#otSOBox').style.display=so?'block':'none';};ts.addEventListener('change',opsUI);
     md.querySelectorAll('input[name=otOpsM]').forEach(i=>i.onchange=()=>{const aw=md.querySelector('input[name=otOpsM]:checked').value==='awal';const el=md.querySelector('#otOps');el.dataset.mode=aw?'before':'after';
       const sp=r.spans,st=new Date(Math.min(...sp.map(x=>+x[0]))),en=new Date(Math.max(...sp.map(x=>+x[1])));
       md.querySelector('#otOpsL').textContent=aw?'Masa lapor diri':'Masa sign off sebenar';md.querySelector('#otOpsH').textContent=aw?`OT dari masa lapor hingga duty mula (${hhmm(st,r.y,r.mo,r.d)})`:`OT dari duty habis (${hhmm(en,r.y,r.mo,r.d)}) hingga sign off`;
@@ -569,6 +586,7 @@ function openDay(d){
     if(odv&&parseDay(v).shifts.length>1&&!(S.otDuty[ck]&&v.includes(S.otDuty[ck]))){toast('Hari ni dah double shift, tak boleh tambah OT duty lagi');return}
     if(odv)S.otDuty[ck]=odv;else delete S.otDuty[ck];
     let os=md.querySelector('#otS').value,oe=md.querySelector('#otE').value,opsMode;
+    if(md.querySelector('#otT').value==='signoff'){os='';oe='';const el=md.querySelector('#otSO');if(el&&el.value){const en=new Date(Math.max(...r.spans.map(x=>+x[1])));os=hhmm(en,r.y,r.mo,r.d).replace(/(\d\d)$/,':$1');oe=el.value;}}
     if(md.querySelector('#otT').value==='ops'){os='';oe='';const el=md.querySelector('#otOps');if(el&&el.value){const sp=r.spans,st=new Date(Math.min(...sp.map(x=>+x[0]))),en=new Date(Math.max(...sp.map(x=>+x[1])));
       opsMode=md.querySelector('input[name=otOpsM]:checked').value;const hr=x=>hhmm(x,r.y,r.mo,r.d).replace(/(\d\d)$/,':$1');if(opsMode==='awal'){os=el.value;oe=hr(st)}else{os=hr(en);oe=el.value}}}
     if(os&&oe&&md.querySelector('#otT').value==='cover'&&v.length>1){toast('Hari double shift tak boleh claim OT Cover Meal Break');return}
