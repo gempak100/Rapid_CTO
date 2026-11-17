@@ -104,6 +104,7 @@ try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if
 
 S.changes = S.changes || {}; S.otManual = S.otManual || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
 const LEAVES=['AL','EL','CL','MC'];const LEAVE_NAME={AL:'Cuti Tahunan',EL:'Cuti Kecemasan',CL:'Compassionate Leave',MC:'Cuti Sakit (MC)',swap:'Tukar shift'};
+const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'Cover meal'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL'};
 const OT_MAX=9; // OT maksimum 9 jam sehari (1 jam excess duty asal dikira berasingan)
 function isPagi(c){c=String(c);if(c.startsWith('BTS'))return c==='BTS A';return c[0]==='A'}
 S.holidays = S.holidays || BASE.holidays || {}; S.events = S.events || BASE.events || [];
@@ -181,18 +182,21 @@ function dayCalc(k,d){
     for(const pt of parts){const last=dsWins[dsWins.length-1];if(last&&pt[0]<=last[1]&&last[2]===pt[2]){if(pt[1]>last[1])last[1]=pt[1];}else dsWins.push([pt[0],pt[1],pt[2]]);}
     otH=dsWins.reduce((a,w)=>a+(w[1]-w[0])/3600000,0);
   }
-  const man=(S.otManual[dkey(y,mo,d)]||[]).map((e,i)=>{const st=new Date(y,mo-1,d,...e.start.split(':').map(Number));let en=new Date(y,mo-1,d,...e.end.split(':').map(Number));if(en<=st)en=new Date(+en+86400000);return {i,st,en,h:(en-st)/3600000,note:e.note||''}});
+  const lastEnd=spans.length?Math.max(...spans.map(x=>+x[1])):0;
+  const man=(S.otManual[dkey(y,mo,d)]||[]).map((e,i)=>{let st=new Date(y,mo-1,d,...e.start.split(':').map(Number));let en=new Date(y,mo-1,d,...e.end.split(':').map(Number));if(en<=st)en=new Date(+en+86400000);
+    if(spans[0]&&st<spans[0][0]&&+st+86400000<lastEnd+2*3600000){st=new Date(+st+86400000);en=new Date(+en+86400000);}
+    return {i,st,en,h:(en-st)/3600000,note:e.note||'',type:e.type||'ot'}});
   let manH=man.reduce((a,b)=>a+b.h,0);
   const ot=[];
   if(jamWin)ot.push({kind:'1 jam shift',st:jamWin[0],en:jamWin[1],h:jamH,note:p.shifts[0]+(swapped?' (tukar)':'')});
   dsWins.forEach(w=>ot.push({kind:'Double shift',st:w[0],en:w[1],pre:w[2],h:(w[1]-w[0])/3600000,note:p.shifts.join(' + ')}));
-  man.forEach(m=>ot.push({kind:'OT tambahan',st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
+  man.forEach(m=>ot.push({kind:MAN_KIND[m.type]||'OT tambahan',mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
-  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift')continue; if(o.h>left){o.h=Math.max(0,left);if(o.pre)o.st=new Date(+o.en-o.h*3600000);else o.en=new Date(+o.st+o.h*3600000);} left-=o.h; }
+  { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover')continue; if(o.h>left){o.h=Math.max(0,left);if(o.pre)o.st=new Date(+o.en-o.h*3600000);else o.en=new Date(+o.st+o.h*3600000);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0) ot.splice(i,1);
     jamH=ot.filter(o=>o.kind==='1 jam shift').reduce((a,b)=>a+b.h,0); if(!jamH)jamWin=null;
     otH=ot.filter(o=>o.kind==='Double shift').reduce((a,b)=>a+b.h,0);
-    manH=ot.filter(o=>o.kind==='OT tambahan').reduce((a,b)=>a+b.h,0); }
+    manH=ot.filter(o=>o.mtype).reduce((a,b)=>a+b.h,0); }
   const nowT=new Date();ot.forEach(o=>o.done=o.en<=nowT);
   const otTot=ot.reduce((a,b)=>a+b.h,0),otDone=ot.filter(o=>o.done).reduce((a,b)=>a+b.h,0);
   const R=S.rates;
@@ -237,6 +241,25 @@ function renderLogin(){
   <div class="row" style="margin-top:14px"><button class="btn primary" id="lgGo">Masuk</button><span id="lgMsg" class="note"></span></div>
   <p class="note" style="margin-top:14px">Dah ada fail backup? <label style="text-decoration:underline;cursor:pointer">Buka backup<input type="file" id="bkLoad" accept=".json,application/json" style="display:none"></label></p></div>`;
 }
+function activeDay(){
+  const nw=new Date();
+  for(const off of [0,-1]){const dt=new Date(nw.getFullYear(),nw.getMonth(),nw.getDate()+off);const k=`${dt.getFullYear()}-${dt.getMonth()+1}`;if(!S.months[k])continue;
+    const r=dayCalc(k,dt.getDate());if(!r.spans.length)continue;const st=Math.min(...r.spans.map(x=>+x[0])),en=Math.max(...r.spans.map(x=>+x[1]));
+    if(off===0||(nw>=st-3600000&&nw<=en+3*3600000))return {k,d:dt.getDate(),m:dt.getMonth()+1,y:dt.getFullYear(),r};}
+  return null;
+}
+function openQuick(type){
+  const ad=activeDay();if(!ad)return;
+  const md=document.createElement('div');md.className='modal';
+  md.innerHTML=`<div class="card"><b>${MAN_KIND[type]} · ${ad.d}/${ad.m}</b><p class="note">Masukkan masa yang supervisor bagi.${type==='ot'?'':' Tidak dikira dalam had 9 jam OT.'}</p>
+  <div class="row"><input id="qS" type="time" style="width:120px"><span>–</span><input id="qE" type="time" style="width:120px"></div>
+  <input id="qN" placeholder="Catatan (pilihan)" style="width:100%;margin-top:8px">
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="qX">Batal</button><button class="btn primary" id="qG">Simpan</button></div></div>`;
+  document.body.appendChild(md);
+  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='qX')md.remove()});
+  md.querySelector('#qG').onclick=()=>{const a=md.querySelector('#qS').value,b=md.querySelector('#qE').value;if(!a||!b){toast('Isi masa mula dan tamat');return}
+    const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#qN').value.trim(),type});md.remove();render();save(MAN_KIND[type]+' disimpan');};
+}
 function render(){
   if(view==='login'){renderLogin();return}
   const [y,m]=cur.split('-').map(Number);
@@ -244,6 +267,8 @@ function render(){
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
   if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtTime(x.st)}–${fmtTime(x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
+  const ad=activeDay();
+  if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button><button class="btn" data-quick="cover">+ Cover meal</button><button class="btn" data-quick="ot">+ OT</button></span></div>`;
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
   if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni. Isi roster di tab Tetapan.</div>`; h+=renderCal(y,m); }
   else if(view==='claim') h+= S.months[cur] ? renderClaim() : `<div class="card">Belum ada roster untuk bulan ni.</div>`;
@@ -321,10 +346,11 @@ function renderOT(){
   <div class="stat"><div class="l">Akan datang (ikut roster)</div><div class="v">${fh(tot-done)} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">1 jam setiap shift</div><div class="v">${fh(by('1 jam shift'))}</div></div>
   <div class="stat"><div class="l">Double shift</div><div class="v">${fh(by('Double shift'))}</div></div>
-  <div class="stat"><div class="l">OT tambahan</div><div class="v">${fh(by('OT tambahan'))}</div></div></div>`;
-  h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">1 jam setiap shift dan double shift dikira sendiri dari roster. Untuk OT lain (balik lewat, dipanggil masuk), tekan hari dalam Kalendar dan isi <b>OT tambahan</b>.</p>
+  <div class="stat"><div class="l">OT tambahan</div><div class="v">${fh(by('OT tambahan'))}</div></div>
+  <div class="stat"><div class="l">Meal break / cover meal</div><div class="v">${fh(by('Meal break')+by('Cover meal'))}</div></div></div>`;
+  h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">1 jam setiap shift dan double shift dikira sendiri dari roster. Untuk OT lain (balik lewat, dipanggil masuk), meal break atau cover meal, tekan hari dalam Kalendar, atau guna butang <b>+ Meal break</b> di atas bila sedang bertugas.</p>
   <table><thead><tr><th>Tarikh</th><th>Jenis</th><th>Masa</th><th>Catatan</th><th class="num">Jam</th><th>Status</th></tr></thead><tbody>`;
-  L.forEach(o=>{const r=o.r;h+=`<tr><td>${r.d}/${r.mo} ${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'][new Date(r.y,r.mo-1,r.d).getDay()]}</td><td><span class="pill ${o.kind==='OT tambahan'?'p-ev':o.kind==='Double shift'?'p-ot':'p-petang'}">${o.kind}</span></td><td>${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</td><td>${esc(o.note)}</td><td class="num">${fh(o.h)}</td><td>${o.done?'<span class="pill p-stby">✓ Dah buat</span>':'<span class="pill p-off">Akan datang</span>'}</td></tr>`});
+  L.forEach(o=>{const r=o.r;h+=`<tr><td>${r.d}/${r.mo} ${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'][new Date(r.y,r.mo-1,r.d).getDay()]}</td><td><span class="pill ${o.mtype==='ot'?'p-ev':o.mtype?'p-leave':o.kind==='Double shift'?'p-ot':'p-petang'}">${o.kind}</span></td><td>${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</td><td>${esc(o.note)}</td><td class="num">${fh(o.h)}</td><td>${o.done?'<span class="pill p-stby">✓ Dah buat</span>':'<span class="pill p-off">Akan datang</span>'}</td></tr>`});
   if(!L.length)h+=`<tr><td colspan="6" class="note">Tiada OT bulan ni.</td></tr>`;
   h+=`</tbody><tfoot><tr><td colspan="4">Jumlah</td><td class="num">${fh(tot)}</td><td>${fh(done)} dah buat</td></tr></tfoot></table></div>
   <div class="row"><button class="btn primary" id="dlform">Borang Claim OT (Excel)</button><button class="btn" id="cpyot">Salin rekod OT</button></div>`;
@@ -409,9 +435,9 @@ function openDay(d){
   <div id="chSwap" style="margin-top:8px;display:${ch&&ch.type==='swap'?'block':'none'}"><div class="row"><input id="swNew" placeholder="Shift baru (cth B2 atau OFF)" value="${esc(ch&&ch.type==='swap'?ch.neu.join(' / '):'')}" style="flex:1;min-width:140px"><input id="swWith" placeholder="Tukar dengan siapa" value="${esc(ch&&ch.with||'')}" style="flex:1;min-width:140px"></div></div>
   <div id="chNote" style="margin-top:8px;display:${ch&&ch.type!=='none'?'block':'none'}"><input id="chN" placeholder="Catatan (sebab / no. rujukan)" value="${esc(ch&&ch.note||'')}" style="width:100%"></div></div>
   <label class="row" style="margin-top:10px"><input type="checkbox" id="dcto" ${r.ctoFlag?'checked':''}> Tuntut CTO hari ni</label>
-  <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">OT tambahan</b>${r.ot.filter(o=>o.kind!=='OT tambahan').map(o=>`<div class="note">Auto: ${o.kind} ${fmtTime(o.st)}–${fmtTime(o.en)} (${fh(o.h)} jam)</div>`).join('')}
-  ${r.ot.filter(o=>o.kind==='OT tambahan').map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill p-ev">${fmtTime(o.st)}–${fmtTime(o.en)} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
-  <div class="row" style="margin-top:6px"><input id="otS" type="time" style="width:110px"><span>–</span><input id="otE" type="time" style="width:110px"><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div></div>
+  <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">OT tambahan / Meal break</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind} ${fmtTime(o.st)}–${fmtTime(o.en)} (${fh(o.h)} jam)</div>`).join('')}
+  ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtTime(o.st)}–${fmtTime(o.en)} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
+  <div class="row" style="margin-top:6px"><select id="otT"><option value="ot">OT tambahan</option><option value="meal">Meal break</option><option value="cover">Cover meal</option></select><input id="otS" type="time" style="width:110px"><span>–</span><input id="otE" type="time" style="width:110px"><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
   <div class="row"><b style="font-size:13px">Cuti umum</b><input id="dh" placeholder="Kosong kalau bukan cuti" value="${esc(hol(y,m,d)||'')}" style="flex:1"></div>
   <div style="margin-top:8px"><b style="font-size:13px">Event Bukit Jalil</b>${evs(y,m,d).map(e=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill p-ev">★ ${esc(e.title)} · ${esc(e.venue||'')}${e.time?' '+e.time:''}</span><button class="btn" style="padding:3px 8px" data-delev="${esc(e.title)}">Buang</button></div>`).join('')}
@@ -440,7 +466,7 @@ function openDay(d){
     if(ctoTouched){ delete S.cto[cur][d]; const want=md.querySelector('#dcto').checked; if(want!==dayCalc(cur,d).ctoDefault) S.cto[cur][d]=want?1:0; }
     const hk=dkey(y,m,d),hv=md.querySelector('#dh').value.trim();if(hv)S.holidays[hk]=hv;else delete S.holidays[hk];
     const os=md.querySelector('#otS').value,oe=md.querySelector('#otE').value;
-    if(os&&oe){(S.otManual[ck]=S.otManual[ck]||[]).push({start:os,end:oe,note:md.querySelector('#otN').value.trim()});}
+    if(os&&oe){(S.otManual[ck]=S.otManual[ck]||[]).push({start:os,end:oe,note:md.querySelector('#otN').value.trim(),type:md.querySelector('#otT').value});}
     else if(os||oe){toast('Isi masa mula dan tamat OT');return}
     const et=md.querySelector('#evt').value.trim();if(et)S.events.push({date:hk,title:et,venue:md.querySelector('#evv').value.trim()||'Bukit Jalil',time:md.querySelector('#evh').value});
     md.remove();render();save('Hari dikemas kini');
@@ -507,20 +533,21 @@ function formRows(k){
     const has=(S.months[k]||{})[d]||S.otManual[dkey(y,mo,d)];if(!has)continue;
     const r=dayCalc(k,d);const c={};const lines=[];
     const ch=S.changes[dkey(y,mo,d)];
-    const man=r.ot.filter(o=>o.kind==='OT tambahan');
+    const man=r.ot.filter(o=>o.mtype);
+    const manLine=o=>'*'+(o.mtype==='ot'?(o.note||'OT').toUpperCase():MAN_LINE[o.mtype]);
     const T4=dt=>hhmm(dt,y,mo,d);
     if(r.shifts.length){
       lines.push(r.shifts.length>1?`${r.shifts[0]}/OT ${r.shifts.slice(1).join('/')} *Excess Working`:`${r.shifts[0]} *Excess Working`);
       if(ch&&ch.type==='swap')lines.push(`*SWAP${ch.with?' '+ch.with.toUpperCase():''} (ASAL ${ch.orig.join('/')})`);
       if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
-      man.forEach(o=>lines.push(`*${(o.note||'OT').toUpperCase()}`));
+      man.forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
       const st=r.spans[0]?r.spans[0][0]:null;
       if(st){c.C=T4(st);c.D=T4(r.spans[0][1]);}
       if(r.holiday)c.G=1;else c.E=1;
       if(r.ot.length){c.H=r.ot.map(o=>T4(o.st)).join('\n');c.I=r.ot.map(o=>T4(o.en)).join('\n');if(r.holiday)c.L=+fh(r.otTot);else c.J=+fh(r.otTot);}
     }else if(r.off){
       lines.push(r.raw);
-      man.forEach(o=>lines.push(`*${(o.note||'OT').toUpperCase()}`));
+      man.forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
       if(man.length){
         const h=man.reduce((a,b)=>a+b.h,0);
         if(/REST/.test(r.raw.toUpperCase())){c.C=man.map(o=>T4(o.st)).join('\n');c.D=man.map(o=>T4(o.en)).join('\n');c.F=h>4?1:0.5;}
@@ -654,7 +681,8 @@ function dlIcs(){
 root.addEventListener('change',e=>{if(e.target.id==='bkLoad'&&e.target.files[0])loadBackup(e.target.files[0])});
 // ---- events ----
 root.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-mnav],[data-ynav],[data-day],[data-msg],[data-undo],#saveEnt,#cpyot,#dlform,#dlx,#dlc,#cpy,#saveSet,#fillRoster,#bkSave,#dlics,#lgGo,#rsSync,#rsOut');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-quick],[data-mnav],[data-ynav],[data-day],[data-msg],[data-undo],#saveEnt,#cpyot,#dlform,#dlx,#dlc,#cpy,#saveSet,#fillRoster,#bkSave,#dlics,#lgGo,#rsSync,#rsOut');if(!t)return;
+  if(t.dataset.quick){openQuick(t.dataset.quick);return}
   if(t.dataset.ynav){const [yy,mm]=cur.split('-').map(Number);cur=`${yy+ +t.dataset.ynav}-${mm}`;render();return}
   if(t.dataset.msg){const c=S.changes[t.dataset.msg];navigator.clipboard.writeText(chMsg(t.dataset.msg,c)).then(()=>toast('Mesej disalin')).catch(()=>toast('Tak dapat salin'));return}
   if(t.dataset.undo){const k=t.dataset.undo,c=S.changes[k];const [yy,mm,dd]=k.split('-').map(Number);const mk=`${yy}-${mm}`;S.months[mk]=S.months[mk]||{};if(c.orig.length)S.months[mk][dd]=c.orig;else delete S.months[mk][dd];delete S.changes[k];render();save('Dibatalkan, ikut roster asal');return}
