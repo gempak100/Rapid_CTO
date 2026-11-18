@@ -350,7 +350,7 @@ function render(){
   let h=`<div class="top"><div><h1>Jadual Kerja & Tugasan Harian</h1><div class="sub">${esc(S.name)} · No. ${esc(S.staffNo)}</div></div>
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
-  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(x.label||x.code)} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
+  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(x.label||x.code)} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.label||x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
   /* butang cepat (Bertugas) dibuang 18 Nov: semua input melalui kotak hari dalam Kalendar */
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
   if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni.</div>`; h+=renderCal(y,m); }
@@ -435,7 +435,7 @@ function renderCal(y,m){
   const up=upcoming().filter(x=>`${x.st.getFullYear()}-${x.st.getMonth()+1}`===cur||x.r.y+'-'+x.r.mo===cur);
   if(up.length){
     g+=`<div class="card"><b>Tambah ke Google Calendar</b><p class="note">Setiap pautan buka Google Calendar dengan shift tu dah terisi. Peringatan ikut tetapan notification default Google Calendar anda.</p><div class="list">`;
-    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${esc(x.label||x.code)}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
+    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${esc(x.label||x.code)}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.label||x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
     g+=`</div></div>`;
   }
   return g;
@@ -550,7 +550,7 @@ function openDay(d){
   const slots=(S.months[cur]||{})[d]||[];const r=dayCalc(cur,d);const [y,m]=cur.split('-').map(Number);
   const md=document.createElement('div');md.className='modal';
   const ck=dkey(y,m,d);const ch=S.changes[ck]||null;
-  const links=r.shifts.map((c,i)=>r.spans[i]?`<a class="btn" href="${gcalLink(c,r.spans[i][0],r.spans[i][1])}" target="_blank" rel="noopener">+ Google Calendar (${c})</a>`:'').join(' ');
+  const links=r.shifts.map((c,i)=>{const lb=(r.labels&&r.labels[i])||c;return r.spans[i]?`<a class="btn" href="${gcalLink(lb,r.spans[i][0],r.spans[i][1])}" target="_blank" rel="noopener">+ Google Calendar (${esc(lb)})</a>`:''}).join(' ');
   md.innerHTML=`<div class="card"><b>${HARI[new Date(y,m-1,d).getDay()]}, ${d} ${BULAN[m-1]} ${y}</b>
   <p class="note">Tulis kod shift. Untuk double shift, asingkan dengan "/" (contoh: A2 / B2). Contoh lain: OFF, REST, AL, MC, OH, BTS A, B PTH STBY.</p>
   <input id="dv" value="${esc(slots.join(' / '))}" style="width:100%">
@@ -835,8 +835,8 @@ function dlIcs(){
   const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Jadual Kerja//MS','CALSCALE:GREGORIAN','X-WR-CALNAME:Jadual Kerja','BEGIN:VTIMEZONE','TZID:Asia/Kuala_Lumpur','BEGIN:STANDARD','DTSTART:19700101T000000','TZOFFSETFROM:+0800','TZOFFSETTO:+0800','TZNAME:MYT','END:STANDARD','END:VTIMEZONE'];
   let cnt=0;
   for(let d=1;d<=n;d++){const r=dayCalc(cur,d);r.shifts.forEach((c,i)=>{const sp=r.spans[i];if(!sp)return;cnt++;
-    L.push('BEGIN:VEVENT',`UID:jk-${y}${pad(m)}${pad(d)}-${c.replace(/\s/g,'')}-${(S.staffNo||'x')}@jadualkerja`,`DTSTAMP:${f(new Date())}`,`DTSTART;TZID=Asia/Kuala_Lumpur:${f(sp[0])}`,`DTEND;TZID=Asia/Kuala_Lumpur:${f(sp[1])}`,`SUMMARY:Kerja ${c}${i>0?' (OT double shift)':''}`,'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:Shift ${c} mula dalam 1 jam`,'TRIGGER:-PT60M','END:VALARM');
-    if(isPagi(c)&&i===0){const prev=new Date(sp[0]);prev.setDate(prev.getDate()-1);prev.setHours(21,0,0,0);L.push('BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:Esok shift pagi ${c}`,`TRIGGER:-PT${Math.round((sp[0]-prev)/60000)}M`,'END:VALARM');}
+    L.push('BEGIN:VEVENT',`UID:jk-${y}${pad(m)}${pad(d)}-${c.replace(/\s/g,'')}-${(S.staffNo||'x')}@jadualkerja`,`DTSTAMP:${f(new Date())}`,`DTSTART;TZID=Asia/Kuala_Lumpur:${f(sp[0])}`,`DTEND;TZID=Asia/Kuala_Lumpur:${f(sp[1])}`,`SUMMARY:Kerja ${(r.labels&&r.labels[i])||c}${i>0?' (OT double shift)':''}`,'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:Shift ${c} mula dalam 1 jam`,'TRIGGER:-PT60M','END:VALARM');
+    if(isPagi(c)&&i===0){const prev=new Date(sp[0]);prev.setDate(prev.getDate()-1);prev.setHours(21,0,0,0);L.push('BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:Esok shift pagi ${(r.labels&&r.labels[i])||c}`,`TRIGGER:-PT${Math.round((sp[0]-prev)/60000)}M`,'END:VALARM');}
     L.push('END:VEVENT');});}
   L.push('END:VCALENDAR');
   if(!cnt){toast('Tiada shift bulan ni');return}
