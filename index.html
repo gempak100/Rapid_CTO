@@ -351,17 +351,20 @@ function render(){
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
   /* Kad atas kalendar: Sedang Bertugas (kalau ada shift berjalan) + Shift Seterusnya */
-  {const nw=new Date();const run=up.filter(x=>x.st<=nw);const nx=up.find(x=>x.st>nw);
+  {const nw=new Date();const run=up.filter(x=>x.st<=nw);const runR=run.length?run[0].r:null;const nx=up.find(x=>x.st>nw&&x.r!==runR);
+   /* label sehari penuh: double shift = "A2 + OT B1" (☎ kalau dipanggil supervisor); masa = mula duty pertama hingga tamat duty terakhir */
+   const dayLb=(r,x)=>r.shifts.length>1?(r.labels||r.shifts).map((c,i)=>i?(r.called?'☎ OT ':'OT ')+c:c).join(' + '):(x.label||x.code);
+   const daySp=r=>[new Date(Math.min(...r.spans.map(y=>+y[0]))),new Date(Math.max(...r.spans.map(y=>+y[1])))];
    const dur=ms=>{const m=Math.max(0,Math.round(ms/60000));const hh=Math.floor(m/60),mm=m%60;return (hh?hh+' jam ':'')+mm+' min'};
    const tgl=x=>`${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}`;
    if(run.length){const x=run[0];const r=x.r;const en=new Date(Math.max(...r.spans.map(y=>+y[1])));const st=new Date(Math.min(...r.spans.map(y=>+y[0])));
-     const pct=Math.min(100,Math.max(0,(nw-st)/(en-st)*100));const lb=r.shifts.length>1?(r.labels||r.shifts).map((c,i)=>i?(r.called?'☎ OT ':'OT ')+c:c).join(' + '):(x.label||x.code);
+     const pct=Math.min(100,Math.max(0,(nw-st)/(en-st)*100));const lb=dayLb(r,x);
      h+=`<div class="card next" style="display:block"><div class="sub">Sedang Bertugas</div><div class="big">${esc(lb)}</div>
      <div>${fmtSpan(st,en)} · tamat dalam <b>${dur(en-nw)}</b></div>
      <div style="height:8px;background:var(--line);border-radius:4px;margin:10px 0 4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${isPagi(x.code)?'var(--pagi)':'var(--petang)'}"></div></div>
      <div class="sub">${Math.round(pct)}% siap · mula ${hhmm(st,r.y,r.mo,r.d)}</div>
-     ${nx?`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div><div class="sub">Shift Seterusnya</div><b>${esc(nx.label||nx.code)} · ${tgl(nx)}</b> <span class="sub">${fmtSpan(nx.st,nx.en)}</span> <span class="pill ${isPagi(nx.code)?'p-pagi':'p-petang'}">${rel(nx.st)}</span></div><a class="btn" style="margin-left:auto" href="${gcalLink(nx.label||nx.code,nx.st,nx.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div>`:''}</div>`;}
-   else if(nx){const x=nx;h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(x.label||x.code)} · ${tgl(x)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.label||x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}}
+     ${nx?`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div><div class="sub">Shift Seterusnya</div><b>${esc(dayLb(nx.r,nx))} · ${tgl(nx)}</b> <span class="sub">${fmtSpan(...daySp(nx.r))}</span> <span class="pill ${isPagi(nx.code)?'p-pagi':'p-petang'}">${rel(nx.st)}</span></div><a class="btn" style="margin-left:auto" href="${gcalLink(dayLb(nx.r,nx),...daySp(nx.r))}" target="_blank" rel="noopener">+ Google Calendar</a></div>`:''}</div>`;}
+   else if(nx){const x=nx;h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(dayLb(x.r,x))} · ${tgl(x)}</div><div>${fmtSpan(...daySp(x.r))} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(dayLb(x.r,x),...daySp(x.r))}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}}
   /* butang cepat (Bertugas) dibuang 18 Nov: semua input melalui kotak hari dalam Kalendar */
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
   if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni.</div>`; h+=renderCal(y,m); }
