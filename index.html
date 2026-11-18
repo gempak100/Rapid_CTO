@@ -88,6 +88,9 @@ a{color:var(--petang)}
 .p-ev{background:var(--ev-bg);color:var(--ev)}
 .list .item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);gap:8px}
 @media (max-width:600px){.day .ev,.day .hol{font-size:9.5px}.day{min-height:64px;padding:4px}.day .t{display:none}.day .code{font-size:11px;padding:1px 3px}.grid{gap:3px}}
+
+/* Huruf besar di awal setiap perkataan untuk label, tajuk & butang (keputusan Faisal 18 Nov) */
+h1,h2,.tabs button,.btn,.card b,.stat .l,label,.pill,.code,.seg label,.modal .card>b,th{text-transform:capitalize}
 </style>
 </head>
 <body>
@@ -347,7 +350,7 @@ function render(){
   let h=`<div class="top"><div><h1>Jadual Kerja & Tugasan Harian</h1><div class="sub">${esc(S.name)} · No. ${esc(S.staffNo)}</div></div>
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
-  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
+  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
   const ad=activeDay();
   if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button>${ad.r.shifts.length>1?'':'<button class="btn" data-quick="cover">+ OT Cover Meal Break</button>'}<button class="btn" data-quick="ops">+ Ops Req</button><button class="btn" data-quick="signoff">+ Exceed sign off</button></span></div>`;
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
@@ -368,7 +371,7 @@ function swapUI(ch,d){
   const w0=ch&&ch.with||'';const wIn=team.some(x=>`${x.name} (${x.id})`===w0);
   return `<div class="row" style="flex-direction:column;align-items:stretch;gap:6px">
   <label class="note" style="margin:0">Shift baru</label>
-  <select id="swSel"><option value="">— Pilih shift —</option>${codes.map(c=>`<option value="${esc(c)}" ${cur0===c?'selected':''}>${esc(c)}${S.times[c]?' ('+tSpan(S.times[c])+')':''}</option>`).join('')}<option value="__lain" ${isLain?'selected':''}>Lain (taip sendiri, cth A2 / B2)</option></select>
+  <select id="swSel"><option value="">— Pilih Shift —</option>${codes.map(c=>`<option value="${esc(c)}" ${cur0===c?'selected':''}>${esc(c)}${S.times[c]?' ('+tSpan(S.times[c])+')':''}</option>`).join('')}<option value="__lain" ${isLain?'selected':''}>Lain (taip sendiri, cth A2 / B2)</option></select>
   <input id="swNew" placeholder="Taip shift (cth A2 / B2)" value="${esc(cur0)}" style="display:${isLain?'block':'none'}">
   <label class="note" style="margin:4px 0 0">Tukar dengan siapa</label>
   <div style="position:relative"><input id="swWith" data-day="${d}" autocomplete="off" placeholder="${team.length?'Taip nama atau no. ID rakan':'Nama rakan'}" value="${esc(w0)}" style="width:100%;box-sizing:border-box">
@@ -562,7 +565,7 @@ function openDay(d){
   <span class="note">${(S.months[cur]||{})[d]&&parseDay((S.months[cur]||{})[d]).shifts.length>1?'Hari ni dah double shift dalam roster.':'Pilih duty OT yang supervisor minta.'}</span></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Meal break / OT Cover Meal / Ops Requirement / Exceed Sign Off</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind==='1 jam shift'?'Excess Working':o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
   ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
-  <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option><option value="signoff">Exceed sign off</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
+  <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal Break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option><option value="signoff">Exceed Sign Off</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
   <div id="otSOBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="row"><span class="note">Masa sign off sebenar</span>${t24in('otSO',r,'after',110)}<span class="note">Claim dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Hanya untuk hari bertugas.</div>'}</div>
   <div id="otOpsBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="seg"><label><input type="radio" name="otOpsM" value="awal">Masuk awal</label><label><input type="radio" name="otOpsM" value="lewat" checked>Balik lewat</label></div>
   <div class="row" style="margin-top:6px"><span id="otOpsL" class="note">Masa sign off sebenar</span>${t24in('otOps',r,'after',110)}<span id="otOpsH" class="note">OT dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Ops Requirement hanya untuk hari bertugas.</div>'}</div></div>
