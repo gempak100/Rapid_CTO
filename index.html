@@ -413,6 +413,7 @@ function renderCal(y,m){
       if(r.ctoFlag!==r.ctoDefault)inner+=`<div class="code p-ot">${r.ctoFlag?'+ CTO':'tiada CTO'}</div>`;
       if(r.spans.length)inner+=`<div class="t">${spanText(r)}</div>`;
       if(r.called)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc(r.called)}</div>`;
+      r.ot.filter(o=>o.mtype==='cover').forEach(o=>{inner+=`<div class="code p-ev" title="OT Cover Meal Break${o.note?' · '+esc(o.note):''}">🍽 Cover ${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='signoff').forEach(o=>{inner+=`<div class="code p-ev" title="Exceed sign off${o.note?' · '+esc(o.note):''}">⏱ Sign off ${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='ops').forEach(o=>{const aw=/awal/.test(o.kind);inner+=`<div class="code p-ev" title="${esc(o.kind)}${o.note?' · '+esc(o.note):''}">⚑ OPS ${aw?'awal':'lewat'}</div>`});
       const ch=S.changes[dkey(y,m,d)];if(ch&&ch.type==='swap')inner+=`<div class="code p-swap" title="Asal: ${esc(ch.orig.join(' / '))}">⇄ tukar</div>`;
