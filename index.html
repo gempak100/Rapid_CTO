@@ -144,19 +144,19 @@ function rm(n){return 'RM '+n.toFixed(2)}
 
 // ---- parsing a day's slots ----
 function parseDay(slots){
-  const r={shifts:[],stby:false,off:false,leave:null,cto:false,ph:false,raw:slots.join(' / ')};
+  const r={shifts:[],labels:[],stby:false,off:false,leave:null,cto:false,ph:false,raw:slots.join(' / ')}; /* labels = kod penuh ikut master roster (cth A1 PSD) */
   for(const s of slots){
     const u=s.toUpperCase();
-    if(/STBY/.test(u)){r.stby=true;r.shifts.push(u.trim()[0]==='A'?'A PTH STBY':'B PTH STBY');continue}
+    if(/STBY/.test(u)){r.stby=true;r.shifts.push(u.trim()[0]==='A'?'A PTH STBY':'B PTH STBY');r.labels.push(u.trim().replace(/\s+/g,' '));continue}
     if(u==='OFF'||u==='REST'){r.off=true;continue}
     if(LEAVES.includes(u)){r.leave=u;continue}
     if(u==='OH'){r.oh=true;continue}
-    if(/^BTS\s*[AB]\b/.test(u)){r.shifts.push('BTS '+u.replace(/^BTS\s*/,'')[0]);continue}
+    if(/^BTS\s*[AB]\b/.test(u)){r.shifts.push('BTS '+u.replace(/^BTS\s*/,'')[0]);r.labels.push(u.trim().replace(/\s+/g,' '));continue}
     if(u==='PH'){r.leave='PH';continue}
     if(/PH\d?/.test(u)) r.ph=true;
     if(/CT/.test(u)) r.cto=true;
     const m=u.match(/\b([AB]\d)/);
-    if(m) r.shifts.push(m[1]);
+    if(m){r.shifts.push(m[1]);r.labels.push(u.trim().replace(/\s+/g,' '));}
   }
   return r;
 }
@@ -243,7 +243,7 @@ function spanText(r){return r.spans.map(s=>hhmm(s[0],r.y,r.mo,r.d)+'–'+hhmm(s[
 // ---- next shift ----
 function upcoming(){
   const list=[];
-  for(const k of Object.keys(S.months)){ const n=monthDays(k); for(let d=1;d<=n;d++){ const r=dayCalc(k,d); r.shifts.forEach((c,i)=>{const sp=r.spans[i]; if(sp) list.push({code:c,st:sp[0],en:sp[1],r});}); } }
+  for(const k of Object.keys(S.months)){ const n=monthDays(k); for(let d=1;d<=n;d++){ const r=dayCalc(k,d); r.shifts.forEach((c,i)=>{const sp=r.spans[i]; if(sp) list.push({code:c,label:(r.labels&&r.labels[i])||c,st:sp[0],en:sp[1],r});}); } }
   return list.filter(x=>x.en>new Date()).sort((a,b)=>a.st-b.st);
 }
 function gcalLink(code,st,en){
@@ -350,7 +350,7 @@ function render(){
   let h=`<div class="top"><div><h1>Jadual Kerja & Tugasan Harian</h1><div class="sub">${esc(S.name)} · No. ${esc(S.staffNo)}</div></div>
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
-  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
+  if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(x.label||x.code)} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
   /* butang cepat (Bertugas) dibuang 18 Nov: semua input melalui kotak hari dalam Kalendar */
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
   if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni.</div>`; h+=renderCal(y,m); }
@@ -412,7 +412,7 @@ function renderCal(y,m){
     else if(r.oh&&!r.shifts.length) inner=`<div class="code p-off">OH</div><div class="t">Office hour</div>`;
     else{
       /* OT dipanggil supervisor: ganti pil "X OT" dengan "☎ OT X" di atas; semua tanda OT diletak atas, sebelum masa */
-      r.shifts.forEach((c,i)=>{if(r.called&&i>0)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc(c)}</div>`;else inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${c}${r.shifts.length>1&&i>0?' OT':''}</div>`});
+      r.shifts.forEach((c,i)=>{if(r.called&&i>0)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc((r.labels&&r.labels[i])||c)}</div>`;else inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${esc((r.labels&&r.labels[i])||c)}${r.shifts.length>1&&i>0?' OT':''}</div>`});
       r.ot.filter(o=>o.mtype==='cover').forEach(o=>{inner+=`<div class="code p-ev" title="OT Cover Meal Break${o.note?' · '+esc(o.note):''}">OT Meal ${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='signoff').forEach(o=>{inner+=`<div class="code p-ev" title="Exceed sign off${o.note?' · '+esc(o.note):''}">⏱ Sign off ${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='ops').forEach(o=>{const aw=/awal/.test(o.kind);inner+=`<div class="code p-ev" title="${esc(o.kind)}${o.note?' · '+esc(o.note):''}">⚑ OPS ${aw?'awal':'lewat'}</div>`});
@@ -435,7 +435,7 @@ function renderCal(y,m){
   const up=upcoming().filter(x=>`${x.st.getFullYear()}-${x.st.getMonth()+1}`===cur||x.r.y+'-'+x.r.mo===cur);
   if(up.length){
     g+=`<div class="card"><b>Tambah ke Google Calendar</b><p class="note">Setiap pautan buka Google Calendar dengan shift tu dah terisi. Peringatan ikut tetapan notification default Google Calendar anda.</p><div class="list">`;
-    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${x.code}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
+    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${esc(x.label||x.code)}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
     g+=`</div></div>`;
   }
   return g;
