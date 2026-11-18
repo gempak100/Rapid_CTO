@@ -507,7 +507,7 @@ function renderCuti(){
   if(!list.length) h+=`<div class="note" style="padding:10px 0">Belum ada rekod untuk tahun ni.</div>`;
   list.forEach(([k,c])=>{const [yy,mm,dd]=k.split('-').map(Number);
     h+=`<div class="item"><span><span class="pill ${c.type==='swap'?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`});
-  h+=`</div></div><div class="card"><b>Kelayakan cuti setahun</b><div class="row" style="margin-top:8px">${LEAVES.map(t=>`<label>${t} <input type="number" min="0" data-ent="${t}" value="${S.leaveEnt[t]??''}"></label>`).join('')}<button class="btn primary" id="saveEnt">Simpan</button></div><p class="note">Baki dikira dari semua hari AL / EL / CL dalam roster dan rekod kau untuk tahun ni.</p></div>`;
+  h+=`</div></div><div class="card"><b>Kelayakan cuti setahun</b><div class="row" style="margin-top:8px">${LEAVES.map(t=>`<label>${t} <input type="number" min="0" data-ent="${t}" value="${S.leaveEnt[t]??''}"></label>`).join('')}<button class="btn primary" id="saveEnt">Simpan</button></div><p class="note">Baki dikira dari semua hari AL / EL / CL dalam roster dan rekod anda untuk tahun ni.</p></div>`;
   return h;
 }
 function renderSettings(){
