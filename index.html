@@ -409,13 +409,13 @@ function renderCal(y,m){
     else if(r.leave) inner=`<div class="code ${LEAVES.includes(r.leave)?'p-leave':'p-off'}">${r.leave}</div>`;
     else if(r.oh&&!r.shifts.length) inner=`<div class="code p-off">OH</div><div class="t">Office hour</div>`;
     else{
-      r.shifts.forEach((c,i)=>{inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${c}${r.shifts.length>1&&i>0?' OT':''}</div>`});
-      if(r.ctoFlag!==r.ctoDefault)inner+=`<div class="code p-ot">${r.ctoFlag?'+ CTO':'tiada CTO'}</div>`;
-      if(r.spans.length)inner+=`<div class="t">${spanText(r)}</div>`;
-      if(r.called)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc(r.called)}</div>`;
+      /* OT dipanggil supervisor: ganti pil "X OT" dengan "☎ OT X" di atas; semua tanda OT diletak atas, sebelum masa */
+      r.shifts.forEach((c,i)=>{if(r.called&&i>0)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc(c)}</div>`;else inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${c}${r.shifts.length>1&&i>0?' OT':''}</div>`});
       r.ot.filter(o=>o.mtype==='cover').forEach(o=>{inner+=`<div class="code p-ev" title="OT Cover Meal Break${o.note?' · '+esc(o.note):''}">OT Meal ${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='signoff').forEach(o=>{inner+=`<div class="code p-ev" title="Exceed sign off${o.note?' · '+esc(o.note):''}">⏱ Sign off ${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='ops').forEach(o=>{const aw=/awal/.test(o.kind);inner+=`<div class="code p-ev" title="${esc(o.kind)}${o.note?' · '+esc(o.note):''}">⚑ OPS ${aw?'awal':'lewat'}</div>`});
+      if(r.ctoFlag!==r.ctoDefault)inner+=`<div class="code p-ot">${r.ctoFlag?'+ CTO':'tiada CTO'}</div>`;
+      if(r.spans.length)inner+=`<div class="t">${spanText(r)}</div>`;
       const ch=S.changes[dkey(y,m,d)];if(ch&&ch.type==='swap')inner+=`<div class="code p-swap" title="Asal: ${esc(ch.orig.join(' / '))}">⇄ tukar</div>`;
     }
     const H=hol(y,m,d),E=evs(y,m,d);
