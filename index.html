@@ -361,8 +361,6 @@ function render(){
      const pct=Math.min(100,Math.max(0,(nw-st)/(en-st)*100));const lb=dayLb(r,x);
      h+=`<div class="card next" style="display:block"><div class="sub">Sedang Bertugas</div><div class="big">${esc(lb)}</div>
      <div>${fmtSpan(st,en)} · tamat dalam <b>${dur(en-nw)}</b></div>
-     <div style="height:8px;background:var(--line);border-radius:4px;margin:10px 0 4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${isPagi(x.code)?'var(--pagi)':'var(--petang)'}"></div></div>
-     <div class="sub">${Math.round(pct)}% siap · mula ${hhmm(st,r.y,r.mo,r.d)}</div>
      ${nx?`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div><div class="sub">Shift Seterusnya</div><b>${esc(dayLb(nx.r,nx))} · ${tgl(nx)}</b> <span class="sub">${fmtSpan(...daySp(nx.r))}</span> <span class="pill ${isPagi(nx.code)?'p-pagi':'p-petang'}">${rel(nx.st)}</span></div><a class="btn" style="margin-left:auto" href="${gcalLink(dayLb(nx.r,nx),...daySp(nx.r))}" target="_blank" rel="noopener">+ Google Calendar</a></div>`:''}</div>`;}
    else if(nx){const x=nx;h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(dayLb(x.r,x))} · ${tgl(x)}</div><div>${fmtSpan(...daySp(x.r))} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(dayLb(x.r,x),...daySp(x.r))}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}} /* Sedang Bertugas hanya semasa duty berjalan */
   /* butang cepat (Bertugas) dibuang 18 Nov: semua input melalui kotak hari dalam Kalendar */
