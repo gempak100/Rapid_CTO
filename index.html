@@ -253,9 +253,9 @@ function rel(dt){const ms=dt-new Date();if(ms<=0)return 'sedang berjalan';const 
 // ---- render ----
 const root=document.createElement('div');root.id='root';document.body.appendChild(root);
 function renderLogin(){
-  root.innerHTML=`<div class="top"><div><h1>Jadual Kerja & Tugasan Harian</h1><div class="sub">Masuk untuk muat jadual kerja kau</div></div></div>
+  root.innerHTML=`<div class="top"><div><h1>Jadual Kerja & Tugasan Harian</h1><div class="sub">Masuk untuk muat jadual kerja anda</div></div></div>
   <div class="card" style="max-width:420px;margin:30px auto">
-  <b>Masuk</b><p class="note">Masukkan kata laluan pasukan (dari group kerja) dan no. pekerja kau. Jadual kerja kau akan dimuat dari roster.</p>
+  <b>Masuk</b><p class="note">Masukkan kata laluan pasukan (dari group kerja) dan no. pekerja anda. Jadual kerja anda akan dimuat dari roster.</p>
   <label>Kata laluan pasukan<br><input id="lgPw" autocomplete="off" autocapitalize="characters" value="${esc(teamPw())}" style="width:100%;margin-top:4px" placeholder="XXXX-XXXX-XXXX"></label>
   <label style="display:block;margin-top:10px">No. pekerja (ID)<br><input id="lgId" inputmode="numeric" value="${esc(S.staffNo||'')}" style="width:100%;margin-top:4px" placeholder="cth 16497"></label>
   <div class="row" style="margin-top:14px"><button class="btn primary" id="lgGo">Masuk</button><span id="lgMsg" class="note"></span></div>
@@ -432,7 +432,7 @@ function renderCal(y,m){
   if(li)g+=`<div class="card"><b>Cuti umum & event Bukit Jalil bulan ni</b><p class="note">Cuti umum Wilayah Persekutuan KL. Tarikh bertanda * tertakluk pada anak bulan. Event Bukit Jalil & operasi tren khas dikemas kini oleh admin (setakat 17 Nov 2026). Tarikh bertanda "jangkaan" belum diumumkan Rapid KL.</p><div class="list">${li}</div></div>`;
   const up=upcoming().filter(x=>`${x.st.getFullYear()}-${x.st.getMonth()+1}`===cur||x.r.y+'-'+x.r.mo===cur);
   if(up.length){
-    g+=`<div class="card"><b>Tambah ke Google Calendar</b><p class="note">Setiap pautan buka Google Calendar dengan shift tu dah terisi. Peringatan ikut tetapan notification default Google Calendar kau.</p><div class="list">`;
+    g+=`<div class="card"><b>Tambah ke Google Calendar</b><p class="note">Setiap pautan buka Google Calendar dengan shift tu dah terisi. Peringatan ikut tetapan notification default Google Calendar anda.</p><div class="list">`;
     up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${x.code}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
     g+=`</div></div>`;
   }
@@ -512,7 +512,7 @@ function renderCuti(){
 }
 function renderSettings(){
   const codes=[...new Set(['A1','A2','A3','B1','B2','B3',...Object.keys(S.times),...Object.values(S.months).flatMap(mo=>Object.values(mo).flatMap(s=>parseDay(s).shifts))])].sort();
-  let h=`<div class="card"><b>Akaun roster</b><p class="note">${S.staffNo?`Masuk sebagai <b>${esc(S.name)}</b> (No. ${esc(S.staffNo)}). Roster dikemas kini sendiri bila apps dibuka dengan internet. Perubahan kau (tukar shift, cuti, OT) tak akan ditimpa.`:'Belum masuk.'}</p>
+  let h=`<div class="card"><b>Akaun roster</b><p class="note">${S.staffNo?`Masuk sebagai <b>${esc(S.name)}</b> (No. ${esc(S.staffNo)}). Roster dikemas kini sendiri bila apps dibuka dengan internet. Perubahan anda (tukar shift, cuti, OT) tak akan ditimpa.`:'Belum masuk.'}</p>
   <div class="row"><button class="btn primary" id="rsSync">Kemas kini roster sekarang</button><button class="btn" id="rsOut">Tukar pengguna</button></div></div>`;
   h+=`<div class="card"><b>Backup & pindah data</b><p class="note">Data disimpan dalam phone/browser ni sahaja. Simpan backup selalu, dan guna fail backup untuk pindah ke phone lain.</p>
   <div class="row"><button class="btn" id="bkSave">Simpan backup</button><label class="btn" style="display:inline-block">Buka backup<input type="file" id="bkLoad" accept=".json,application/json" style="display:none"></label></div></div>`;
