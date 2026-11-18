@@ -351,10 +351,9 @@ function render(){
   <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
   if(up[0]){const x=up[0];h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${x.code} · ${HARI[x.st.getDay()]} ${x.st.getDate()} ${BULAN[x.st.getMonth()].slice(0,3)}</div><div>${fmtSpan(x.st,x.en)} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(x.code,x.st,x.en)}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}
-  const ad=activeDay();
-  if(ad)h+=`<div class="card row" style="justify-content:space-between"><span><b>Bertugas ${ad.d}/${ad.m}</b> <span class="sub">${esc(ad.r.raw)}</span></span><span class="row"><button class="btn" data-quick="meal">+ Meal break</button>${ad.r.shifts.length>1?'':'<button class="btn" data-quick="cover">+ OT Cover Meal Break</button>'}<button class="btn" data-quick="ops">+ Ops Req</button><button class="btn" data-quick="signoff">+ Exceed sign off</button></span></div>`;
+  /* butang cepat (Bertugas) dibuang 18 Nov: semua input melalui kotak hari dalam Kalendar */
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
-  if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni. Isi roster di tab Tetapan.</div>`; h+=renderCal(y,m); }
+  if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni.</div>`; h+=renderCal(y,m); }
   else if(view==='claim') h+= S.months[cur] ? renderClaim() : `<div class="card">Belum ada roster untuk bulan ni.</div>`;
   if(view==='tetapan') h+=renderSettings();
   if(view==='cuti') h+=renderCuti();
@@ -473,7 +472,7 @@ function renderOT(){
   <div class="stat"><div class="l">OT Cover Meal</div><div class="v">${fh(L.filter(o=>o.mtype==='cover').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">Ops Requirement</div><div class="v">${fh(L.filter(o=>o.mtype==='ops').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div>
   <div class="stat"><div class="l">Exceed sign off</div><div class="v">${fh(L.filter(o=>o.mtype==='signoff').reduce((a,b)=>a+b.h,0))} <span class="sub">jam</span></div></div></div>`;
-  h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">Double shift dikira sendiri dari roster. Excess Working 1 jam setiap duty juga direkod di sini. Untuk meal break, OT cover meal atau ops requirement, tekan hari dalam Kalendar, atau guna butang cepat di atas bila sedang bertugas.</p>
+  h+=`<div class="card" style="overflow-x:auto"><b>Rekod jam OT</b><p class="note">Double shift dikira sendiri dari roster. Excess Working 1 jam setiap duty juga direkod di sini. Untuk meal break, OT cover meal, ops requirement atau exceed sign off, tekan hari dalam Kalendar.</p>
   <table><thead><tr><th>Tarikh</th><th>Jenis</th><th>Masa</th><th>Catatan</th><th class="num">Jam</th><th>Status</th></tr></thead><tbody>`;
   /* hari double shift: excess duty asal + double shift digabung satu baris */
   const LD=[];const seen=new Set();
