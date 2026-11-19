@@ -693,7 +693,7 @@ function formRows(k){
     const manLine=o=>'*'+(o.mtype==='ot'?(o.note||'OT').toUpperCase():o.mtype==='ops'?'OPS REQ'+(o.note?' ('+o.note.toUpperCase()+')':''):MAN_LINE[o.mtype]);
     const T4=dt=>hhmm(dt,y,mo,d);
     if(r.shifts.length){
-      { const parts=[r.shifts[0],...r.shifts.slice(1).map(x=>'OT '+x)]; if(man.some(o=>o.mtype==='cover'))parts.push('OT Cover Meal'); lines.push(parts.join('/')+' *Excess Working'); }
+      { /* susun ikut masa: OT yang mula sebelum duty asal ditulis dulu (cth B3 + OT A3 -> "OT A3/B3") */ const sh=r.shifts.map((c,i)=>({t:i?'OT '+c:c,st:r.spans[i]?+r.spans[i][0]:0})); const parts=[sh[0],...sh.slice(1).sort((a,b)=>a.st-b.st)].sort((a,b)=>a.st-b.st).map(x=>x.t); if(man.some(o=>o.mtype==='cover'))parts.push('OT Cover Meal'); lines.push(parts.join('/')+' *Excess Working'); }
       /* tukar shift: borang tulis duty baru sahaja, tanpa nama rakan */
       if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
       man.filter(o=>o.mtype!=='cover').forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
