@@ -411,6 +411,11 @@ function bindSwap(md){
   wi.addEventListener('input',show);wi.addEventListener('focus',show);
   wi.addEventListener('blur',()=>setTimeout(()=>sug.style.display='none',150));
 }
+/* Exceed Sign Off: pilihan masa sign off (setiap 5 minit, hingga 3 jam selepas duty habis) */
+function soSelect(r){const en=new Date(Math.max(...r.spans.map(x=>+x[1])));const opts=[];
+  for(let m=5;m<=180;m+=5){const t=new Date(+en+m*60000);const v=hhmm(t,r.y,r.mo,r.d);const hh=Math.floor(m/60),mm=m%60;
+    opts.push(`<option value="${v.slice(0,-2)}:${v.slice(-2)}">${v}  (+${hh?hh+' jam ':''}${mm?mm+' min':''} = ${fh(m/60)} jam)</option>`)}
+  return `<select id="otSO"><option value="">— Pilih masa sign off —</option>${opts.join('')}</select>`}
 function renderCal(y,m){
   const first=new Date(y,m-1,1).getDay();const n=monthDays(cur);const mo=S.months[cur]||{};
   let g=`<div class="card"><div class="grid">${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'].map(d=>`<div class="dow">${d}</div>`).join('')}`;
@@ -577,7 +582,7 @@ function openDay(d){
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Meal break / OT Cover Meal / Ops Requirement / Exceed Sign Off</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind==='1 jam shift'?'Excess Working':o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
   ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
   <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal Break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option><option value="signoff">Exceed Sign Off</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
-  <div id="otSOBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="row"><span class="note">Masa sign off sebenar</span>${t24in('otSO',r,'after',110)}<span class="note">Claim dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Hanya untuk hari bertugas.</div>'}</div>
+  <div id="otSOBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="row"><span class="note">Masa sign off sebenar</span>${soSelect(r)}<span class="note">Claim dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Hanya untuk hari bertugas.</div>'}</div>
   <div id="otOpsBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="seg"><label><input type="radio" name="otOpsM" value="awal">Masuk awal</label><label><input type="radio" name="otOpsM" value="lewat" checked>Balik lewat</label></div>
   <div class="row" style="margin-top:6px"><span id="otOpsL" class="note">Masa sign off sebenar</span>${t24in('otOps',r,'after',110)}<span id="otOpsH" class="note">OT dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Ops Requirement hanya untuk hari bertugas.</div>'}</div></div>
   <div class="row" style="margin-top:10px">${links}</div>
