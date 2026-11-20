@@ -218,6 +218,8 @@ function dayCalc(k,d){
     otH=ot.filter(o=>o.kind==='Double shift').reduce((a,b)=>a+b.h,0);
     manH=ot.filter(o=>o.mtype).reduce((a,b)=>a+b.h,0); }
   const nowT=new Date();ot.forEach(o=>o.done=o.en<=nowT);
+  /* jam setiap baris OT ikut Jadual Penukaran Minit ke Perpuluhan: minit ÷ 60, 2 tempat perpuluhan (cth 20 min = 0.33) */
+  const r2=h=>Math.round(Math.round(h*60)/60*100)/100;ot.forEach(o=>{o.h=r2(o.h);if(o.full)o.full=r2(o.full);});
   const otTot=ot.reduce((a,b)=>a+b.h,0),otDone=ot.filter(o=>o.done).reduce((a,b)=>a+b.h,0);
   const R=S.rates;
   const amt={pagi:pagi*R.pagi,petang:petang*R.petang,cto:ctoFlag?R.cto:0,stby:p.stby?R.stby:0};
