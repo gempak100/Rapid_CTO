@@ -789,7 +789,8 @@ function buildClaimForm(k){
       // nama panjang dikecilkan supaya muat penuh dalam petak D52:G52 (~145pt)
       const sz=Math.max(6,Math.min(11,Math.floor(145/(sup.length*0.47)*2)/2));
       x=x.slice(0,m.index)+`<c r="D52"${sA} t="inlineStr"><is><r><rPr><b/><sz val="${sz}"/><rFont val="Arial Narrow"/><family val="2"/></rPr><t xml:space="preserve">${xe(sup)}</t></r></is></c>`+x.slice(m.index+m[0].length);}}{const n=new Date(),pd=x=>String(x).padStart(2,'0');const td=`${pd(n.getDate())}.${pd(n.getMonth()+1)}.${n.getFullYear()}`; /* tarikh cetak */
-    set('D53',td);set('A51','Date : '+td);}
+    set('D53',td);{const m=x.match(/<c r="A51"((?: [a-zA-Z:]+="[^"]*")*)\s*(?:\/>|>[\s\S]*?<\/c>)/);if(m){const sA=(m[1].match(/ s="\d+"/)||[''])[0];const R=(t,b)=>`<r><rPr>${b?'<b/>':''}<sz val="11"/><rFont val="Arial Narrow"/><family val="2"/></rPr><t xml:space="preserve">${t}</t></r>`;
+      x=x.slice(0,m.index)+`<c r="A51"${sA} t="inlineStr"><is>${R('Date : ',false)}${R(td,true)}</is></c>`+x.slice(m.index+m[0].length);}}}
   for(const [d,c] of Object.entries(rows)){const r=13+ +d;
     // Saiz petak kekal macam borang asal (30pt muat 2 baris). Kalau lebih 2 baris, kecilkan tulisan petak tu sahaja supaya muat.
     const lines=k=>{const v=c[k];if(!v)return 1;const t=v.text!==undefined?v.text:String(v);return t.split('\n').length};
