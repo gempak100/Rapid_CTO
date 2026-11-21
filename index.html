@@ -189,7 +189,7 @@ function dayCalc(k,d){
   const swapped=(S.changes[dkey(y,mo,d)]||{}).type==='swap';
   if(CH.on&&p.shifts.length&&spans[0]&&(CH.swap||!swapped)){jamH=+CH.jam||0;const en=spans[0][1];jamWin=[new Date(en.getTime()-jamH*3600000),en];
     /* Excess Working masa sendiri (pilihan pengguna): dari jam terakhir duty mula hingga masa dipilih */
-    const ex=S.excess[dkey(y,mo,d)];if(ex!==undefined){const b=new Date(y,mo-1,d);const [hh,mm]=ex.split(':').map(Number);let e=new Date(+b+(hh*60+mm)*60000);if(e<jamWin[0])e=jamWin[0];if(e>en)e=en;jamWin=[jamWin[0],e];jamH=(e-jamWin[0])/3600000;}}
+    const ex=S.excess[dkey(y,mo,d)];if(ex){const b=new Date(y,mo-1,d);const T=x=>{const [hh,mm]=x.split(':').map(Number);return new Date(+b+(hh*60+mm)*60000)};let s0=ex.st?T(ex.st):jamWin[0],e0=T(ex.en||ex);if(e0<=s0)e0=new Date(+e0+86400000);if(+s0<+spans[0][0]&&+s0+86400000<=+en+3*3600000){s0=new Date(+s0+86400000);e0=new Date(+e0+86400000);}jamWin=[s0,e0];jamH=(e0-s0)/3600000;}}
   // Double shift: masa duty OT yang tidak bertindih dengan duty asal (sebelum atau selepas duty asal)
   let dsWins=[];
   if(p.shifts.length>1&&spans.length===p.shifts.length){
@@ -417,13 +417,10 @@ function bindSwap(md){
 }
 /* Excess Working: pilih claim 1 jam penuh atau masa sendiri (setiap 5 minit) */
 function exUI(r){const CH=S.claimHour;if(!(CH&&CH.on)||!r.spans||!r.spans.length)return '';
-  const en=r.spans[0][1];const st=new Date(+en-(+CH.jam||1)*3600000);const ck=dkey(r.y,r.mo,r.d);const cur=S.excess[ck];
-  const v=t=>{const x=hhmm(t,r.y,r.mo,r.d);return x.slice(0,-2)+':'+x.slice(-2)};
-  let o=`<option value="" ${cur===undefined?'selected':''}>${(+CH.jam||1)} jam penuh (${hhmm(st,r.y,r.mo,r.d)}–${hhmm(en,r.y,r.mo,r.d)})</option>`;
-  const tot=Math.round((en-st)/60000);
-  for(let m=tot-5;m>=5;m-=5){const t=new Date(+st+m*60000);const val=v(t);o+=`<option value="${val}" ${cur===val?'selected':''}>${hhmm(st,r.y,r.mo,r.d)}–${hhmm(t,r.y,r.mo,r.d)} (${m} min = ${fh(Math.round(m/60*100)/100)} jam)</option>`;}
-  o+=`<option value="${v(st)}" ${cur===v(st)?'selected':''}>Tiada excess (0 jam)</option>`;
-  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Excess Working</b><div class="note">Claim 1 jam penuh, atau pilih masa sebenar.</div><select id="exSel" style="margin-top:6px">${o}</select></div>`}
+  const en=r.spans[0][1];const st=new Date(+en-(+CH.jam||1)*3600000);const cur=S.excess[dkey(r.y,r.mo,r.d)];
+  const a=cur&&cur.st?cur.st.replace(':',''):hhmm(st,r.y,r.mo,r.d),b=cur&&cur.en?cur.en.replace(':',''):(typeof cur==='string'?cur.replace(':',''):hhmm(en,r.y,r.mo,r.d));
+  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Excess Working</b><div class="note">Biasa ${(+CH.jam||1)} jam (${hhmm(st,r.y,r.mo,r.d)}–${hhmm(en,r.y,r.mo,r.d)}). Ubah masa kalau lain — jam dikira sendiri dalam borang.</div>
+  <div class="row" style="margin-top:6px;gap:6px">${t24in('exS',r,'',110).replace('placeholder="HHMM"',`placeholder="HHMM" value="${a}"`)}<span>–</span>${t24in('exE',r,'',110).replace('placeholder="HHMM"',`placeholder="HHMM" value="${b}"`)}</div></div>`}
 /* Exceed Sign Off: pilihan masa sign off (setiap 5 minit, hingga 3 jam selepas duty habis) */
 function soSelect(r){const en=new Date(Math.max(...r.spans.map(x=>+x[1])));const opts=[];
   for(let m=5;m<=180;m+=5){const t=new Date(+en+m*60000);const v=hhmm(t,r.y,r.mo,r.d);const hh=Math.floor(m/60),mm=m%60;
@@ -595,7 +592,7 @@ function openDay(d){
   ${exUI(r)}<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Meal break / OT Cover Meal / Ops Requirement / Exceed Sign Off</b>${r.ot.filter(o=>!o.mtype).map(o=>`<div class="note">Auto: ${o.kind==='1 jam shift'?'Excess Working':o.kind} ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} (${fh(o.h)} jam)</div>`).join('')}
   ${r.ot.filter(o=>o.mtype).map(o=>`<div class="row" style="justify-content:space-between;margin-top:4px"><span class="pill ${o.mtype==='ot'?'p-ev':'p-leave'}">${o.kind} · ${fmtSpan(o.st,o.en,new Date(r.y,r.mo-1,r.d))} · ${fh(o.h)} jam${o.note?' · '+esc(o.note):''}</span><button class="btn" style="padding:3px 8px" data-delot="${o.i}">Buang</button></div>`).join('')}
   <div class="row" style="margin-top:6px"><select id="otT"><option value="meal">Meal Break</option><option value="cover">OT Cover Meal Break</option><option value="ops">Ops Requirement</option><option value="signoff">Exceed Sign Off</option></select><span id="otSE" class="row" style="gap:6px">${t24in('otS',r,'',110)}<span>–</span>${t24in('otE',r,'',110)}</span><input id="otN" placeholder="Catatan" style="flex:1;min-width:100px"></div>
-  <div id="otSOBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="row"><span class="note">Masa sign off sebenar</span>${soSelect(r)}<span class="note">Claim dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Hanya untuk hari bertugas.</div>'}</div>
+  <div id="otSOBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="row"><span class="note">Masa sign off sebenar</span>${t24in('otSO',r,'after',110)}<span class="note">Claim dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Hanya untuk hari bertugas.</div>'}</div>
   <div id="otOpsBox" style="display:none;margin-top:8px">${r.spans.length?`<div class="seg"><label><input type="radio" name="otOpsM" value="awal">Masuk awal</label><label><input type="radio" name="otOpsM" value="lewat" checked>Balik lewat</label></div>
   <div class="row" style="margin-top:6px"><span id="otOpsL" class="note">Masa sign off sebenar</span>${t24in('otOps',r,'after',110)}<span id="otOpsH" class="note">OT dari duty habis (${hhmm(new Date(Math.max(...r.spans.map(x=>+x[1]))),r.y,r.mo,r.d)}) hingga sign off</span></div>`:'<div class="note">Ops Requirement hanya untuk hari bertugas.</div>'}</div></div>
   <div class="row" style="margin-top:10px">${links}</div>
@@ -632,7 +629,10 @@ function openDay(d){
     if(!parseDay(v).shifts.length)odv=''; /* OFF/REST/cuti: tak boleh dipanggil OT */
     if(odv&&parseDay(v).shifts.length>1&&!(S.otDuty[ck]&&v.includes(S.otDuty[ck]))){toast('Hari ni dah double shift, tak boleh tambah OT duty lagi');return}
     if(odv)S.otDuty[ck]=odv;else delete S.otDuty[ck];
-    {const xs=md.querySelector('#exSel');if(xs){if(xs.value==='')delete S.excess[ck];else S.excess[ck]=xs.value;}}
+    {const xs=md.querySelector('#exS'),xe=md.querySelector('#exE');if(xs&&xe){const nr=x=>{const v=norm24(x.value,x);return v||''};const vs=nr(xs),ve=nr(xe);
+      const r0=dayCalc(`${y}-${m}`,d);const en=r0.spans[0]&&r0.spans[0][1];const st0=en&&new Date(+en-(+S.claimHour.jam||1)*3600000);
+      const def=en&&vs===hhmm(st0,y,m,d).replace(/(\d\d)$/,':$1')&&ve===hhmm(en,y,m,d).replace(/(\d\d)$/,':$1');
+      if(!vs||!ve||def)delete S.excess[ck];else S.excess[ck]={st:vs,en:ve};}}
     let os=md.querySelector('#otS').value,oe=md.querySelector('#otE').value,opsMode;
     if(md.querySelector('#otT').value==='signoff'){os='';oe='';const el=md.querySelector('#otSO');if(el&&el.value){const en=new Date(Math.max(...r.spans.map(x=>+x[1])));os=hhmm(en,r.y,r.mo,r.d).replace(/(\d\d)$/,':$1');oe=el.value;}}
     if(md.querySelector('#otT').value==='ops'){os='';oe='';const el=md.querySelector('#otOps');if(el&&el.value){const sp=r.spans,st=new Date(Math.min(...sp.map(x=>+x[0]))),en=new Date(Math.max(...sp.map(x=>+x[1])));
