@@ -787,7 +787,9 @@ function buildClaimForm(k){
   {const sup=String(F.superior||'').trim();const m=x.match(/<c r="D52"((?: [a-zA-Z:]+="[^"]*")*)\s*(?:\/>|>[\s\S]*?<\/c>)/);
     if(m&&sup){const sA=(m[1].match(/ s="\d+"/)||[''])[0];
       // nama panjang dikecilkan supaya muat penuh dalam petak D52:G52 (~145pt)
-      const sz=Math.max(6,Math.min(11,Math.floor(145/(sup.length*0.47)*2)/2));
+      const NW={A:592,B:592,C:592,D:592,E:547,F:501,G:638,H:592,I:228,J:456,K:592,L:501,M:683,N:592,O:638,P:547,Q:638,R:592,S:547,T:501,U:592,V:547,W:774,X:547,Y:547,Z:501,' ':228,'.':228,"'":195,'/':228,'-':273}; // lebar huruf Arial Narrow Bold (per 1000 em)
+      const em=[...sup.toUpperCase()].reduce((t,ch)=>t+(NW[ch]||600),0)/1000;
+      const sz=Math.max(6,Math.min(11,Math.floor(132/em*2)/2)); // muat dalam D52:G52
       x=x.slice(0,m.index)+`<c r="D52"${sA} t="inlineStr"><is><r><rPr><b/><sz val="${sz}"/><rFont val="Arial Narrow"/><family val="2"/></rPr><t xml:space="preserve">${xe(sup)}</t></r></is></c>`+x.slice(m.index+m[0].length);}}{const n=new Date(),pd=x=>String(x).padStart(2,'0');const td=`${pd(n.getDate())}.${pd(n.getMonth()+1)}.${n.getFullYear()}`; /* tarikh cetak */
     set('D53',td);{const m=x.match(/<c r="A51"((?: [a-zA-Z:]+="[^"]*")*)\s*(?:\/>|>[\s\S]*?<\/c>)/);if(m){const sA=(m[1].match(/ s="\d+"/)||[''])[0];const R=(t,b)=>`<r><rPr>${b?'<b/>':''}<sz val="11"/><rFont val="Arial Narrow"/><family val="2"/></rPr><t xml:space="preserve">${t}</t></r>`;
       x=x.slice(0,m.index)+`<c r="A51"${sA} t="inlineStr"><is>${R('Date : ',false)}${R(td,true)}</is></c>`+x.slice(m.index+m[0].length);}}}
