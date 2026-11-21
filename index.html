@@ -556,7 +556,7 @@ function renderSettings(){
   <div class="row"><label class="row"><input type="checkbox" id="chOn" ${S.claimHour.on?'checked':''}> Aktif</label><label>Jam / shift <input type="number" step="0.5" min="0" id="chJam" value="${S.claimHour.jam}"></label><label class="row"><input type="checkbox" id="chSw" ${S.claimHour.swap?'checked':''}> Termasuk shift yang ditukar</label></div></div>`;
   h+=`  <div class="card"><b>Maklumat borang claim</b><p class="note">Keluar di bahagian atas borang Application for Overtime / Allowance.</p>
   <div class="row" style="margin-top:8px"><label style="flex:1;min-width:200px">Nama penuh<br><input id="nm" value="${esc(S.name)}" style="width:100%"></label><label>No. pekerja (ID penuh)<br><input id="sn" value="${esc(S.staffNo)}" style="width:140px"></label></div>
-  <div class="row" style="margin-top:8px">${[['depot','Depot / Sector / Department','TRAIN OPS AMP LINE'],['designation','Designation','TRANSIT OFFICER'],['grade','Grade','JG 4'],['superior','Nama immediate superior (auto ikut no. pekerja)','']].map(([k,l,ph])=>`<label style="flex:1;min-width:180px">${l}<br><input data-form="${k}" value="${esc(S.form[k]||'')}" placeholder="${ph}" style="width:100%"></label>`).join('')}</div></div>
+  <div class="row" style="margin-top:8px">${[['grade','Grade','JG 4'],['superior','Nama immediate superior (auto ikut no. pekerja)','']].map(([k,l,ph])=>`<label style="flex:1;min-width:180px">${l}<br><input data-form="${k}" value="${esc(S.form[k]||'')}" placeholder="${ph}" style="width:100%"></label>`).join('')}</div></div>
   <div class="row"><button class="btn primary" id="saveSet">Simpan tetapan</button></div>`;
   return h;
 }
@@ -778,7 +778,7 @@ function buildClaimForm(k){
     inner=inner.slice(0,last.index)+'<t xml:space="preserve">'+xe(val)+'</t>'+inner.slice(last.index+last[0].length);
     x=x.slice(0,m.index)+`<c r="${ref}"${sAttr} t="inlineStr"><is>${inner}</is></c>`+x.slice(m.index+m[0].length);
   }
-  setRich('C3',S.name);setRich('C4',F.depot||'TRAIN OPS AMP LINE');setRich('C5',F.designation||'TRANSIT OFFICER');setRich('C6',OFFICE_CONTACT);
+  setRich('C3',S.name);setRich('C4','TRAIN OPS AMP LINE');setRich('C5','TRANSIT OFFICER');setRich('C6',OFFICE_CONTACT);
   setRich('M3',' '+S.staffNo);setRich('M4',F.grade||'');setRich('M5',' '+BULAN_EN[mo-1]+' '+y);
   set('D52',F.superior||' ');set('D53',' ');
   for(const [d,c] of Object.entries(rows)){const r=13+ +d;
