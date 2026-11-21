@@ -105,7 +105,7 @@ const LS_KEY='jadual_kerja_state_v1';
 function mergeDefaults(d){ for(const [k,v] of Object.entries(BASE.holidays)) if(!(k in d.holidays)) d.holidays[k]=v; const ek=new Set(d.events.map(e=>e.date+e.title)); BASE.events.forEach(e=>{if(!ek.has(e.date+e.title))d.events.push(e)}); for(const [k,v] of Object.entries(BASE.times)) if(!d.times[k]) d.times[k]=v; return d; }
 try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if(d){ d.holidays=d.holidays||{}; d.events=d.events||[]; d.times=d.times||{}; S=mergeDefaults(d);} } }catch(e){}
 
-S.changes = S.changes || {}; S.otManual = S.otManual || {}; S.otDuty = S.otDuty || {}; S.excess = S.excess || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
+S.form=S.form||{};if(/TRAIN OPERATION/i.test(S.form.depot||''))S.form.depot='TRAIN OPS AMP LINE';delete S.form.contact;S.changes = S.changes || {}; S.otManual = S.otManual || {}; S.otDuty = S.otDuty || {}; S.excess = S.excess || {}; if(!S.times['B PTH STBY']) S.times['B PTH STBY']=['14:00','00:00']; if(!S.times['A PTH STBY']) S.times['A PTH STBY']=['06:00','16:00']; for(const [k,v] of Object.entries({'A4':['04:00','14:00'],'A5':['04:15','14:15'],'A6':['04:00','14:00'],'A7':['06:00','16:00'],'B4':['14:30','00:30'],'B5':['15:30','01:30'],'B6':['15:30','01:30'],'BTS A':['06:00','16:00'],'BTS B':['14:00','00:00']})) if(!S.times[k]) S.times[k]=v; if(S.ctoAuto===undefined) S.ctoAuto=true; S.form = S.form || {depot:'',designation:'',grade:'',contact:'',superior:''}; S.claimHour = S.claimHour || {on:true,jam:1,swap:true}; S.leaveEnt = S.leaveEnt || {AL:'',EL:'',CL:''};
 const LEAVES=['AL','EL','CL','MC'];const LEAVE_NAME={AL:'Cuti Tahunan',EL:'Cuti Kecemasan',CL:'Compassionate Leave',MC:'Cuti Sakit (MC)',swap:'Tukar shift'};
 const MAN_KIND={ot:'OT tambahan',meal:'Meal break',cover:'OT Cover Meal Break',ops:'Ops Requirement',signoff:'Exceed sign off'};const MAN_LINE={meal:'MEAL BREAK',cover:'OT COVER MEAL',ops:'OPS REQ',signoff:'Ex Sign Off'};
 const COVER_H=4; // OT cover meal biasanya 4 jam
@@ -556,7 +556,7 @@ function renderSettings(){
   <div class="row"><label class="row"><input type="checkbox" id="chOn" ${S.claimHour.on?'checked':''}> Aktif</label><label>Jam / shift <input type="number" step="0.5" min="0" id="chJam" value="${S.claimHour.jam}"></label><label class="row"><input type="checkbox" id="chSw" ${S.claimHour.swap?'checked':''}> Termasuk shift yang ditukar</label></div></div>`;
   h+=`  <div class="card"><b>Maklumat borang claim</b><p class="note">Keluar di bahagian atas borang Application for Overtime / Allowance.</p>
   <div class="row" style="margin-top:8px"><label style="flex:1;min-width:200px">Nama penuh<br><input id="nm" value="${esc(S.name)}" style="width:100%"></label><label>No. pekerja (ID penuh)<br><input id="sn" value="${esc(S.staffNo)}" style="width:140px"></label></div>
-  <div class="row" style="margin-top:8px">${[['depot','Depot / Sector / Department','TRAIN OPERATION / AGL'],['designation','Designation','TRANSIT OFFICER'],['grade','Grade','JG 4'],['contact','Contact no','01X-XXXXXXX'],['superior','Nama immediate superior (auto ikut no. pekerja)','']].map(([k,l,ph])=>`<label style="flex:1;min-width:180px">${l}<br><input data-form="${k}" value="${esc(S.form[k]||'')}" placeholder="${ph}" style="width:100%"></label>`).join('')}</div></div>
+  <div class="row" style="margin-top:8px">${[['depot','Depot / Sector / Department','TRAIN OPS AMP LINE'],['designation','Designation','TRANSIT OFFICER'],['grade','Grade','JG 4'],['superior','Nama immediate superior (auto ikut no. pekerja)','']].map(([k,l,ph])=>`<label style="flex:1;min-width:180px">${l}<br><input data-form="${k}" value="${esc(S.form[k]||'')}" placeholder="${ph}" style="width:100%"></label>`).join('')}</div></div>
   <div class="row"><button class="btn primary" id="saveSet">Simpan tetapan</button></div>`;
   return h;
 }
@@ -752,6 +752,7 @@ function formRows(k){
 const normNm=x=>String(x||'').toUpperCase().replace(/\s+/g,' ').trim();
 /* Tandatangan group leader untuk lajur Supervisor's verification */
 function sigFor(nm){const n=normNm(nm);if(!n)return '';const src=Object.assign({},typeof SIGS!=='undefined'?SIGS:{},S.sigs||{});for(const [k,v] of Object.entries(src))if(normNm(k)===n||n.startsWith(normNm(k)))return v;return ''}
+const OFFICE_CONTACT='03 42891688 - 21125'; // no. pejabat (ikut borang rasmi)
 function buildClaimForm(k){
   const {rows,T,y,mo}=formRows(k);
   let x=FORM_TPL.sheet;
@@ -777,7 +778,7 @@ function buildClaimForm(k){
     inner=inner.slice(0,last.index)+'<t xml:space="preserve">'+xe(val)+'</t>'+inner.slice(last.index+last[0].length);
     x=x.slice(0,m.index)+`<c r="${ref}"${sAttr} t="inlineStr"><is>${inner}</is></c>`+x.slice(m.index+m[0].length);
   }
-  setRich('C3',S.name);setRich('C4',F.depot||'');setRich('C5',F.designation||'');setRich('C6',' '+(F.contact||''));
+  setRich('C3',S.name);setRich('C4',F.depot||'TRAIN OPS AMP LINE');setRich('C5',F.designation||'TRANSIT OFFICER');setRich('C6',OFFICE_CONTACT);
   setRich('M3',' '+S.staffNo);setRich('M4',F.grade||'');setRich('M5',' '+BULAN_EN[mo-1]+' '+y);
   set('D52',F.superior||' ');set('D53',' ');
   for(const [d,c] of Object.entries(rows)){const r=13+ +d;
