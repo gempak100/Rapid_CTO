@@ -264,7 +264,7 @@ function renderLogin(){
   <div class="card" style="max-width:420px;margin:30px auto">
   <b>Masuk</b><p class="note">Masukkan kata laluan pasukan (dari group kerja) dan no. pekerja anda. Jadual kerja anda akan dimuat dari roster.</p>
   <label>Kata laluan pasukan<br><input id="lgPw" autocomplete="off" autocapitalize="characters" value="${esc(teamPw())}" style="width:100%;margin-top:4px" placeholder="XXXX-XXXX-XXXX"></label>
-  <label style="display:block;margin-top:10px">No. pekerja (ID)<br><input id="lgId" inputmode="numeric" value="${esc(S.staffNo||'')}" style="width:100%;margin-top:4px" placeholder="cth 16497"></label>
+  <label style="display:block;margin-top:10px">No. pekerja (ID)<br><input id="lgId" inputmode="numeric" value="${esc(S.staffNo||'')}" style="width:100%;margin-top:4px" placeholder="cth 12345"></label>
   <div class="row" style="margin-top:14px"><button class="btn primary" id="lgGo">Masuk</button><span id="lgMsg" class="note"></span></div>
   <p class="note" style="margin-top:14px">Dah ada fail backup? <label style="text-decoration:underline;cursor:pointer">Buka backup<input type="file" id="bkLoad" accept=".json,application/json" style="display:none"></label></p></div>`;
 }
@@ -378,7 +378,7 @@ function render(){setTimeout(showActiveTab,0);
   root.innerHTML=h;
 }
 /* ===== Tukar shift: pilih shift & rakan dari roster ===== */
-/* No. pekerja penuh (cth 10016497) atau pendek (16497) -> ID roster */
+/* No. pekerja penuh (cth 10012345) atau pendek (12345) -> ID roster */
 function shortId(x){x=String(x||'').trim().replace(/\D/g,'');if(x.length===8&&x.startsWith('100'))x=String(+x-10000000);return x.replace(/^0+/,'')}
 /* Group leader (KKSB Transit Officer Grouping, Sept 2026) dari roster */
 function leaderFor(id){const sid=shortId(id);if(!sid)return '';const srcs=[...Object.values(S.team||{}),...(typeof TEAM!=='undefined'?Object.values(TEAM):[])];for(const L of srcs){const x=(L||[]).find(t=>shortId(t.id)===sid);if(x&&x.leader)return x.leader}return ''}
