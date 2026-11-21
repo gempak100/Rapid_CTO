@@ -327,11 +327,19 @@ end $$;
 select public.reset_demo();
 
 -- Fungsi boleh dipanggil oleh pengguna log masuk sahaja
-revoke execute on all functions in schema public from anon, public;
+revoke execute on all functions in schema public from anon, authenticated, public;
+alter default privileges in schema public revoke execute on functions from anon, authenticated, public;
 grant execute on function public.submit_claim(bigint), public.user_edit_row(bigint,int,text,text), public.request_unlock(bigint,text),
   public.leader_flag(bigint,int,text,text,text), public.leader_unflag(bigint,int), public.leader_edit(bigint,int,text,text,text,text),
   public.ask_fix(bigint), public.approve_claim(bigint), public.decide_unlock(bigint,boolean), public.remind_user(uuid),
   public.mark_read(), public.reset_demo(), public.can_see_claim(bigint), public._leader_of(uuid) to authenticated;
+-- search_path tetap untuk fungsi pembantu (advisor Supabase)
+alter function public._mins(text) set search_path=public;
+alter function public._jam(text,text) set search_path=public;
+alter function public._t4(text) set search_path=public;
+alter function public._stamp() set search_path=public;
+alter function public._plabel(text) set search_path=public;
+alter function public._is_owner(public.claims) set search_path=public;
 
 -- Realtime (kemas kini terus di skrin lain)
 do $$ begin
