@@ -459,12 +459,7 @@ function renderCal(y,m){
     if(H)li+=`<div class="item"><span><span class="pill p-hol">Cuti</span> ${d} ${BULAN[m-1].slice(0,3)} (${dn}) · ${esc(H)}</span><span class="note">${(mo[d]||[]).join(' / ')}</span></div>`;
     evs(y,m,d).forEach(e=>{li+=`<div class="item"><span><span class="pill p-ev">Event</span> ${d} ${BULAN[m-1].slice(0,3)} (${dn}) · <b>${esc(e.title)}</b> — ${esc(e.venue||'Bukit Jalil')}${e.time?' · '+e.time.replace(':',''):''}</span><span class="note">${(mo[d]||[]).join(' / ')}</span></div>`});}
   if(li)g+=`<div class="card"><b>Cuti umum & event Bukit Jalil bulan ni</b><p class="note">Cuti umum Wilayah Persekutuan KL. Tarikh bertanda * tertakluk pada anak bulan. Event Bukit Jalil & operasi tren khas dikemas kini oleh admin (setakat 17 Nov 2026). Tarikh bertanda "jangkaan" belum diumumkan Rapid KL.</p><div class="list">${li}</div></div>`;
-  const up=upcoming().filter(x=>`${x.st.getFullYear()}-${x.st.getMonth()+1}`===cur||x.r.y+'-'+x.r.mo===cur);
-  if(up.length){
-    g+=`<div class="card"><b>Tambah ke Google Calendar</b><p class="note">Setiap pautan buka Google Calendar dengan shift tu dah terisi. Peringatan ikut tetapan notification default Google Calendar anda.</p><div class="list">`;
-    up.forEach(x=>{g+=`<div class="item"><span><span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${esc(x.label||x.code)}</span> ${HARI[x.st.getDay()]} ${x.st.getDate()}/${x.st.getMonth()+1} · ${fmtSpan(x.st,x.en)}</span><a href="${gcalLink(x.label||x.code,x.st,x.en)}" target="_blank" rel="noopener">Tambah</a></div>`});
-    g+=`</div></div>`;
-  }
+  /* kad 'Tambah ke Google Calendar' dibuang 21 Nov */
   return g;
 }
 function renderClaim(){
