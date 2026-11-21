@@ -546,14 +546,13 @@ function renderCuti(){
   const y=+cur.split('-')[0];const used=leaveUsed(y);
   const all=Object.entries(S.changes).filter(([k])=>+k.split('-')[0]===y).sort((a,b)=>a[0]<b[0]?-1:1);
   const swaps=all.filter(([k,c])=>c.type==='swap'),leaves=all.filter(([k,c])=>c.type!=='swap');
-  let h=`<div class="monthbar"><button class="btn" data-ynav="-1">‹</button><h2>Tahun ${y}</h2><button class="btn" data-ynav="1">›</button></div>`;
-  h+=`<div class="row" style="gap:6px;margin-bottom:12px"><button class="btn ${ctab==='swap'?'primary':''}" style="flex:1" data-ctab="swap">⇄ Tukar Shift (${swaps.length})</button><button class="btn ${ctab==='leave'?'primary':''}" style="flex:1" data-ctab="leave">Cuti (${leaves.length})</button></div>`;
+  const [cy,cm]=cur.split('-').map(Number);const mSw=swaps.filter(([k])=>+k.split('-')[1]===cm);
+  let h=`<div class="row" style="gap:6px;margin-bottom:12px"><button class="btn ${ctab==='swap'?'primary':''}" style="flex:1" data-ctab="swap">⇄ Tukar Shift</button><button class="btn ${ctab==='leave'?'primary':''}" style="flex:1" data-ctab="leave">Cuti</button></div>`;
+  h+=ctab==='swap'?`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[cm-1]} ${cy}</h2><button class="btn" data-mnav="1">›</button></div>`:`<div class="monthbar"><button class="btn" data-ynav="-1">‹</button><h2>Tahun ${y}</h2><button class="btn" data-ynav="1">›</button></div>`;
   const item=([k,c])=>{const [yy,mm,dd]=k.split('-').map(Number);
     return `<div class="item"><span><span class="pill ${c.type==='swap'?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`};
   if(ctab==='swap'){
-    const bulan=new Set(swaps.map(([k])=>k.split('-')[1])).size;
-    h+=`<div class="stats"><div class="stat"><div class="l">Tukar shift tahun ni</div><div class="v">${swaps.length} <span class="sub">kali</span></div></div><div class="stat"><div class="l">Dalam</div><div class="v">${bulan} <span class="sub">bulan</span></div></div></div>`;
-    h+=`<div class="card"><b>Rekod tukar shift</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih Tukar shift. "Salin mesej" sediakan mesej permohonan untuk supervisor.</p><div class="list">${swaps.length?swaps.map(item).join(''):'<div class="note" style="padding:10px 0">Belum ada rekod tukar shift untuk tahun ni.</div>'}</div></div>`;
+    h+=`<div class="card"><b>Tukar shift ${BULAN[cm-1]} (${mSw.length})</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih Tukar shift. "Salin mesej" sediakan mesej permohonan untuk supervisor.</p><div class="list">${mSw.length?mSw.map(item).join(''):'<div class="note" style="padding:10px 0">Tiada tukar shift bulan ni.</div>'}</div></div>`;
   }else{
     h+=`<div class="stats">`;
     LEAVES.forEach(t=>{const ent=S.leaveEnt[t];const bal=ent!==''&&ent!=null?(+ent-used[t]):null;
