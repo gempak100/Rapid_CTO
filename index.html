@@ -419,7 +419,7 @@ function bindSwap(md){
 function exUI(r){const CH=S.claimHour;if(!(CH&&CH.on)||!r.spans||!r.spans.length)return '';
   const en=r.spans[0][1];const st=new Date(+en-(+CH.jam||1)*3600000);const cur=S.excess[dkey(r.y,r.mo,r.d)];
   const a=cur&&cur.st?cur.st.replace(':',''):hhmm(st,r.y,r.mo,r.d),b=cur&&cur.en?cur.en.replace(':',''):(typeof cur==='string'?cur.replace(':',''):hhmm(en,r.y,r.mo,r.d));
-  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Excess Working</b><div class="note">Biasa ${(+CH.jam||1)} jam (${hhmm(st,r.y,r.mo,r.d)}–${hhmm(en,r.y,r.mo,r.d)}). Ubah masa kalau lain — jam dikira sendiri dalam borang.</div>
+  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b style="font-size:13px">Excess Working</b><div class="note">Biasa ${(+CH.jam||1)} jam (${hhmm(st,r.y,r.mo,r.d)}–${hhmm(en,r.y,r.mo,r.d)}). Ubah masa jika punch card awal — claim akan dikira oleh sistem dalam Tugasan Harian.</div>
   <div class="row" style="margin-top:6px;gap:6px">${t24in('exS',r,'',110).replace('placeholder="HHMM"',`placeholder="HHMM" value="${a}"`)}<span>–</span>${t24in('exE',r,'',110).replace('placeholder="HHMM"',`placeholder="HHMM" value="${b}"`)}</div></div>`}
 /* Exceed Sign Off: pilihan masa sign off (setiap 5 minit, hingga 3 jam selepas duty habis) */
 function soSelect(r){const en=new Date(Math.max(...r.spans.map(x=>+x[1])));const opts=[];
