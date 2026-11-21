@@ -783,7 +783,11 @@ function buildClaimForm(k){
   }
   setRich('C3',S.name);setRich('C4','TRAIN OPS AMP LINE');setRich('C5','TRANSIT OFFICER');setRich('C6',OFFICE_CONTACT);
   setRich('M3',' '+S.staffNo);setRich('M4',F.grade||'');setRich('M5',' '+BULAN_EN[mo-1]+' '+y);
-  set('D52',F.superior||' ');set('D53',' ');
+  {const sup=String(F.superior||'').trim();const m=x.match(/<c r="D52"((?: [a-zA-Z:]+="[^"]*")*)\s*(?:\/>|>[\s\S]*?<\/c>)/);
+    if(m&&sup){const sA=(m[1].match(/ s="\d+"/)||[''])[0];
+      // nama panjang dikecilkan supaya muat penuh dalam petak D52:G52 (~145pt)
+      const sz=Math.max(6,Math.min(11,Math.floor(145/(sup.length*0.47)*2)/2));
+      x=x.slice(0,m.index)+`<c r="D52"${sA} t="inlineStr"><is><r><rPr><b/><sz val="${sz}"/><rFont val="Arial Narrow"/><family val="2"/></rPr><t xml:space="preserve">${xe(sup)}</t></r></is></c>`+x.slice(m.index+m[0].length);}}set('D53',' ');
   for(const [d,c] of Object.entries(rows)){const r=13+ +d;
     // Saiz petak kekal macam borang asal (30pt muat 2 baris). Kalau lebih 2 baris, kecilkan tulisan petak tu sahaja supaya muat.
     const lines=k=>{const v=c[k];if(!v)return 1;const t=v.text!==undefined?v.text:String(v);return t.split('\n').length};
