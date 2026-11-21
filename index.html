@@ -552,12 +552,12 @@ function renderCuti(){
   const item=([k,c])=>{const [yy,mm,dd]=k.split('-').map(Number);
     return `<div class="item"><span><span class="pill ${c.type==='swap'?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`};
   if(ctab==='swap'){
-    h+=`<div class="card"><b>Tukar shift ${BULAN[cm-1]} (${mSw.length})</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih Tukar shift. "Salin mesej" sediakan mesej permohonan untuk supervisor.</p><div class="list">${mSw.length?mSw.map(item).join(''):'<div class="note" style="padding:10px 0">Tiada tukar shift bulan ni.</div>'}</div></div>`;
+    h+=`<div class="card"><b>Tukar shift ${BULAN[cm-1]} (${mSw.length})</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih Tukar shift.</p><div class="list">${mSw.length?mSw.map(item).join(''):'<div class="note" style="padding:10px 0">Tiada tukar shift bulan ni.</div>'}</div></div>`;
   }else{
     h+=`<div class="stats">`;
     LEAVES.forEach(t=>{const ent=S.leaveEnt[t];const bal=ent!==''&&ent!=null?(+ent-used[t]):null;
       h+=`<div class="stat"><div class="l">${LEAVE_NAME[t].includes("("+t+")")?LEAVE_NAME[t]:LEAVE_NAME[t]+" ("+t+")"}</div><div class="v">${used[t]} <span class="sub">hari diguna</span></div><div class="l">${bal==null?'Kelayakan belum diisi':`Baki: <b>${bal}</b> / ${ent} hari`}</div></div>`});
-    h+=`</div><div class="card"><b>Rekod cuti</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih AL, EL atau CL. "Salin mesej" sediakan mesej permohonan untuk supervisor.</p><div class="list">${leaves.length?leaves.map(item).join(''):'<div class="note" style="padding:10px 0">Belum ada rekod cuti untuk tahun ni.</div>'}</div></div>`;
+    h+=`</div><div class="card"><b>Rekod cuti</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih AL, EL atau CL.</p><div class="list">${leaves.length?leaves.map(item).join(''):'<div class="note" style="padding:10px 0">Belum ada rekod cuti untuk tahun ni.</div>'}</div></div>`;
     h+=`<div class="card"><b>Kelayakan cuti setahun</b><div class="row" style="margin-top:8px">${LEAVES.map(t=>`<label>${t} <input type="number" min="0" data-ent="${t}" value="${S.leaveEnt[t]??''}"></label>`).join('')}<button class="btn primary" id="saveEnt">Simpan</button></div><p class="note">Baki dikira dari semua hari AL / EL / CL dalam roster dan rekod anda untuk tahun ni.</p></div>`;
   }
   return h;
