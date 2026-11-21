@@ -38,6 +38,7 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.02em}
 .p-petang{background:var(--petang-bg);color:var(--petang)}
 .p-ot{background:var(--ot-bg);color:var(--ot)}
 .p-off{background:var(--off-bg);color:var(--off)}
+.code.est,.pill.est{background:transparent;border:1px dashed var(--off);color:var(--off);opacity:.85}
 .p-stby{background:var(--stby-bg);color:var(--stby)}
 .monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .monthbar h2{margin:0;font-size:18px}
@@ -370,7 +371,7 @@ function render(){setTimeout(showActiveTab,0);
    else if(nx){const x=nx;h+=`<div class="card next"><div><div class="sub">Shift Seterusnya</div><div class="big">${esc(dayLb(x.r,x))} · ${tgl(x)}</div><div>${fmtSpan(...daySp(x.r))} <span class="pill ${isPagi(x.code)?'p-pagi':'p-petang'}">${rel(x.st)}</span></div></div><div style="margin-left:auto"><a class="btn" href="${gcalLink(dayLb(x.r,x),...daySp(x.r))}" target="_blank" rel="noopener">+ Google Calendar</a></div></div>`}} /* Sedang Bertugas hanya semasa duty berjalan */
   /* butang cepat (Bertugas) dibuang 18 Nov: semua input melalui kotak hari dalam Kalendar */
   if(view==='kalendar'||view==='claim'||view==='ot') h+=`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[m-1]} ${y}</h2><button class="btn" data-mnav="1">›</button></div>`;
-  if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni.</div>`; h+=renderCal(y,m); }
+  if(view==='kalendar'){ if(!S.months[cur]) h+=`<div class="warn">Belum ada roster untuk bulan ni.${estCycle()?` OFF / REST ditunjuk sebagai <b>anggaran</b> ikut kitaran anda (${estCycle().L-2} hari kerja, OFF, REST). Ia mungkin berubah bila roster rasmi keluar.`:''}</div>`; h+=renderCal(y,m); }
   else if(view==='claim') h+= S.months[cur] ? renderClaim() : `<div class="card">Belum ada roster untuk bulan ni.</div>`;
   if(view==='tetapan') h+=renderSettings();
   if(view==='cuti') h+=renderCuti();
@@ -434,6 +435,19 @@ function soSelect(r){const en=new Date(Math.max(...r.spans.map(x=>+x[1])));const
   for(let m=5;m<=180;m+=5){const t=new Date(+en+m*60000);const v=hhmm(t,r.y,r.mo,r.d);const hh=Math.floor(m/60),mm=m%60;
     opts.push(`<option value="${v.slice(0,-2)}:${v.slice(-2)}">${v}  (+${hh?hh+' jam ':''}${mm?mm+' min':''} = ${fh(m/60)} jam)</option>`)}
   return `<select id="otSO"><option value="">— Pilih masa sign off —</option>${opts.join('')}</select>`}
+/* Anggaran OFF/REST untuk hari tanpa roster: cari kitaran user (4 kerja+OFF+REST atau 5 kerja+OFF+REST) dari roster terkini */
+let _estC=null,_estK='';
+function estCycle(){
+  const key=JSON.stringify(S.months).length+'|'+Object.keys(S.months).join(',');if(key===_estK)return _estC;_estK=key;
+  const dn=(y,m,d)=>Math.round(Date.UTC(y,m-1,d)/864e5);const pts=[];
+  for(const k of Object.keys(S.months)){const [y,m]=k.split('-').map(Number);for(const [d,v] of Object.entries(S.months[k]||{})){const t=[].concat(v).join(' ');pts.push([dn(y,m,+d),/\bOFF\b/.test(t)?'O':/\bREST\b/.test(t)?'R':'.'])}}
+  if(pts.length<14)return _estC=null;
+  pts.sort((a,b)=>a[0]-b[0]);const last=pts[pts.length-1][0];const recent=pts.filter(p=>p[0]>last-35);
+  let best=null;
+  for(const L of [6,7])for(let ph=0;ph<L;ph++){let hit=0,tot=0;for(const [n,c] of recent){const k=((n-ph)%L+L)%L;const e=k===L-2?'O':k===L-1?'R':'.';if(c!=='.'||e!=='.'){tot++;if(c===e)hit++}}const sc=tot?hit/tot:0;if(!best||sc>best.sc)best={L,ph,sc}}
+  return _estC=best&&best.sc>=0.8?{...best,last}:null;
+}
+function estDay(y,m,d){const c=estCycle();if(!c)return null;const n=Math.round(Date.UTC(y,m-1,d)/864e5);if(n<=c.last||n>c.last+400)return null;const k=((n-c.ph)%c.L+c.L)%c.L;return k===c.L-2?'OFF':k===c.L-1?'REST':null}
 function renderCal(y,m){
   const first=new Date(y,m-1,1).getDay();const n=monthDays(cur);const mo=S.months[cur]||{};
   let g=`<div class="card"><div class="grid">${['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'].map(d=>`<div class="dow">${d}</div>`).join('')}`;
@@ -441,7 +455,7 @@ function renderCal(y,m){
   for(let d=1;d<=n;d++){
     const r=dayCalc(cur,d);const isT=now.getFullYear()===y&&now.getMonth()+1===m&&now.getDate()===d;
     let inner='';
-    if(!mo[d]) inner='';
+    if(!mo[d]){const es=estDay(y,m,d);inner=es?`<div class="code est" title="Anggaran ikut kitaran anda, belum ikut roster rasmi">${es}</div><div class="t">anggaran</div>`:'';}
     else if(r.off) inner=`<div class="code p-off">${esc(r.raw)}</div>`+(r.offOT?`<div class="code p-swap">☎ OT ${esc(r.offOT)}</div>`:'');
     else if(r.leave) inner=`<div class="code ${LEAVES.includes(r.leave)?'p-leave':'p-off'}">${r.leave}</div>`;
     else if(r.oh&&!r.shifts.length) inner=`<div class="code p-off">OH</div><div class="t">Office hour</div>`;
@@ -461,7 +475,7 @@ function renderCal(y,m){
     E.forEach(e=>{top+=`<div class="ev" title="${esc(e.title)} · ${esc(e.venue||'')}">★ ${esc(e.title)}</div>`});
     g+=`<div class="day ${r.off?'off':''} ${isT?'today':''} ${H?'isHol':''}" data-day="${d}"><div class="n">${d}</div>${top}${inner}</div>`;
   }
-  g+=`</div><div class="legend"><span class="pill p-pagi">Pagi (A)</span><span class="pill p-petang">Petang (B)</span><span class="pill p-stby">Standby</span><span class="pill p-off">Off / Rest</span><span class="pill p-leave">AL / EL / CL</span><span class="pill p-swap">⇄ Tukar shift</span><span class="pill p-hol">Cuti umum</span><span class="pill p-ev">★ Event Bukit Jalil / 🚆 Operasi tren</span></div><p class="note">Tekan mana-mana hari untuk tukar shift, OT dipanggil, meal break atau ops requirement. 🚆 = operasi tren khas (masuk awal / balik lewat).</p><div class="row"><button class="btn" id="dlics">Muat turun calendar bulan ni (.ics)</button><span class="note">Buka fail tu untuk masukkan shift dalam calendar phone dengan peringatan.</span></div></div>`;
+  g+=`</div><div class="legend"><span class="pill p-pagi">Pagi (A)</span><span class="pill p-petang">Petang (B)</span><span class="pill p-stby">Standby</span><span class="pill p-off">Off / Rest</span><span class="pill est">Anggaran OFF / REST</span><span class="pill p-leave">AL / EL / CL</span><span class="pill p-swap">⇄ Tukar shift</span><span class="pill p-hol">Cuti umum</span><span class="pill p-ev">★ Event Bukit Jalil / 🚆 Operasi tren</span></div><p class="note">Tekan mana-mana hari untuk tukar shift, OT dipanggil, meal break atau ops requirement. 🚆 = operasi tren khas (masuk awal / balik lewat).</p><div class="row"><button class="btn" id="dlics">Muat turun calendar bulan ni (.ics)</button><span class="note">Buka fail tu untuk masukkan shift dalam calendar phone dengan peringatan.</span></div></div>`;
   const n2=monthDays(cur);let li='';
   for(let d=1;d<=n2;d++){const H=hol(y,m,d);const dn=HARI[new Date(y,m-1,d).getDay()];
     if(H)li+=`<div class="item"><span><span class="pill p-hol">Cuti</span> ${d} ${BULAN[m-1].slice(0,3)} (${dn}) · ${esc(H)}</span><span class="note">${(mo[d]||[]).join(' / ')}</span></div>`;
