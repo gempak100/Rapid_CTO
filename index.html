@@ -348,11 +348,12 @@ function openQuick(type){
   md.querySelector('#qG').onclick=()=>{const a=md.querySelector('#qS').value,b=md.querySelector('#qE').value;if(!a||!b){toast('Isi masa mula dan tamat');return}
     const key=dkey(ad.y,ad.m,ad.d);(S.otManual[key]=S.otManual[key]||[]).push({start:a,end:b,note:md.querySelector('#qN').value.trim(),type});md.remove();render();save(MAN_KIND[type]+' disimpan');};
 }
-function render(){
+function showActiveTab(){try{const t=document.querySelector('.tabs button.on');if(t){const c=t.parentElement;const l=t.offsetLeft-c.offsetLeft,r=l+t.offsetWidth;if(r>c.scrollLeft+c.clientWidth)c.scrollLeft=r-c.clientWidth+8;else if(l<c.scrollLeft)c.scrollLeft=Math.max(0,l-8);}}catch(e){}}
+function render(){setTimeout(showActiveTab,0);
   if(view==='login'){renderLogin();return}
   const [y,m]=cur.split('-').map(Number);
   let h=`<div class="top"><div><h1>Jadual Kerja & Tugasan Harian</h1><div class="sub">${esc(S.name)} · No. ${esc(S.staffNo)}</div></div>
-  <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Cuti & Tukar'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
+  <div class="tabs">${[['kalendar','Kalendar'],['claim','Claim'],['ot','Rekod OT'],['cuti','Rekod Tukar Shift & Cuti'],['tetapan','Tetapan']].map(([t,l])=>`<button data-tab="${t}" class="${view===t?'on':''}">${l}</button>`).join('')}</div></div>`;
   const up=upcoming();
   /* Kad atas kalendar: Sedang Bertugas (kalau ada shift berjalan) + Shift Seterusnya */
   {const nw=new Date();const run=up.filter(x=>x.st<=nw);const runR=run.length?run[0].r:null;const nx=up.find(x=>x.st>nw&&x.r!==runR);
