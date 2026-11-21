@@ -381,7 +381,9 @@ function render(){
 function shortId(x){x=String(x||'').trim().replace(/\D/g,'');if(x.length===8&&x.startsWith('100'))x=String(+x-10000000);return x.replace(/^0+/,'')}
 /* Group leader (KKSB Transit Officer Grouping, Sept 2026) dari roster */
 function leaderFor(id){const sid=shortId(id);if(!sid)return '';const srcs=[...Object.values(S.team||{}),...(typeof TEAM!=='undefined'?Object.values(TEAM):[])];for(const L of srcs){const x=(L||[]).find(t=>shortId(t.id)===sid);if(x&&x.leader)return x.leader}return ''}
-document.addEventListener('input',e=>{if(e.target&&e.target.id==='sn'){const L=leaderFor(e.target.value);const sup=document.querySelector('[data-form="superior"]');if(L&&sup){sup.value=L;}}});
+function staffFor(id){const sid=shortId(id);if(!sid)return null;const srcs=[...Object.values(S.team||{}),...(typeof TEAM!=='undefined'?Object.values(TEAM):[])];for(const L of srcs){const x=(L||[]).find(t=>shortId(t.id)===sid);if(x)return x}return null}
+function supHint(id){const x=staffFor(id);return x&&x.leader?`Padanan ID ${10000000+ +shortId(id)}: <b>${esc(x.name)}</b> → group leader <b>${esc(x.leader)}</b>`:(shortId(id)?'ID ini tiada dalam senarai group leader.':'')}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='sn'){const x=staffFor(e.target.value);const sup=document.querySelector('[data-form="superior"]');if(x&&x.leader&&sup){sup.value=x.leader;}const h=document.getElementById('supHint');if(h)h.innerHTML=supHint(e.target.value);}});
 function teamFor(k){return ((S.team&&S.team[k])||(typeof TEAM!=='undefined'&&TEAM[k])||[])}
 function swapCodes(){return [...Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b,undefined,{numeric:true}):isPagi(a)?-1:1)),'OFF','REST']}
 function swapUI(ch,d){
@@ -556,6 +558,7 @@ function renderSettings(){
   <div class="row"><label class="row"><input type="checkbox" id="chOn" ${S.claimHour.on?'checked':''}> Aktif</label><label>Jam / shift <input type="number" step="0.5" min="0" id="chJam" value="${S.claimHour.jam}"></label><label class="row"><input type="checkbox" id="chSw" ${S.claimHour.swap?'checked':''}> Termasuk shift yang ditukar</label></div></div>`;
   h+=`  <div class="card"><b>Maklumat borang claim</b><p class="note">Keluar di bahagian atas borang Application for Overtime / Allowance.</p>
   <div class="row" style="margin-top:8px"><label style="flex:1;min-width:200px">Nama penuh<br><input id="nm" value="${esc(S.name)}" style="width:100%"></label><label>No. pekerja (ID penuh)<br><input id="sn" value="${esc(S.staffNo)}" style="width:140px"></label></div>
+  <p class="note" id="supHint" style="margin:6px 0 0">${supHint(S.staffNo)}</p>
   <div class="row" style="margin-top:8px">${[['grade','Grade','JG 4'],['superior','Nama immediate superior (auto ikut no. pekerja)','']].map(([k,l,ph])=>`<label style="flex:1;min-width:180px">${l}<br><input data-form="${k}" value="${esc(S.form[k]||'')}" placeholder="${ph}" style="width:100%"></label>`).join('')}</div></div>
   <div class="row"><button class="btn primary" id="saveSet">Simpan tetapan</button></div>`;
   return h;
@@ -842,7 +845,7 @@ async function syncRoster(pw,id,opts={}){
       else if(me.days[d]&&me.days[d].length) out[d]=me.days[d];
     }
     S.months[k]=out;if(!had)added.push(k);
-    if(data.sigs)S.sigs=data.sigs;S.team=S.team||{};S.team[k]=data.staff.map(x=>({id:String(x.id),name:x.name,days:x.days,leader:x.leader||''}));if(me.leader&&!(S.form&&S.form.superior)){S.form=S.form||{};S.form.superior=me.leader;}
+    if(data.sigs)S.sigs=data.sigs;S.team=S.team||{};S.team[k]=data.staff.map(x=>({id:String(x.id),name:x.name,days:x.days,leader:x.leader||''}));if(me.leader){S.form=S.form||{};S.form.superior=me.leader;}
     if(opts.login||!S.name)S.name=me.name;S.staffNo=String(me.id);S.line=me.line;
   }
   if(!found)throw new Error('id');
@@ -861,7 +864,7 @@ async function doLogin(){
 }
 async function autoSync(){
   const pw=teamPw();if(!pw||!S.staffNo||!navigator.onLine)return;
-  try{const before=JSON.stringify([S.months,S.team]);const added=await syncRoster(pw,S.staffNo);if(!added.length&&JSON.stringify([S.months,S.team])!==before){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster dikemas kini');}if(added.length){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster baru: '+added.map(k=>{const [yy,mm]=k.split('-').map(Number);return BULAN[mm-1]+' '+yy}).join(', '))}else{try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render()}}catch(e){}
+  try{const before=JSON.stringify([S.months,S.team,(S.form||{}).superior]);const added=await syncRoster(pw,S.staffNo);if(!added.length&&JSON.stringify([S.months,S.team,(S.form||{}).superior])!==before){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster dikemas kini');}if(added.length){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render();toast('Roster baru: '+added.map(k=>{const [yy,mm]=k.split('-').map(Number);return BULAN[mm-1]+' '+yy}).join(', '))}else{try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){};render()}}catch(e){}
 }
 function fillRoster(){
   const mv=document.getElementById('rMonth').value;const msg=document.getElementById('rosterMsg');
