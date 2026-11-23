@@ -105,10 +105,11 @@ const BASE = S;
 const LS_KEY='jadual_kerja_state_v1';
 /* Tukar shift: kod bertanda "OT" ialah duty OT; yang tanpa "OT" ialah duty utama (cth "A3 / OT B3" atau "OT A3 / B3") */
 function normDuty(tokens){const t=tokens.map(x=>String(x).trim().toUpperCase().replace(/\s+/g,' ')).filter(Boolean);
-  const isOT=x=>/^OT\s+\S/.test(x);const strip=x=>x.replace(/^OT\s+/,'');
+  const isOT=x=>/^OT\s+\S/.test(x)||/\S\s+OT$/.test(x);const strip=x=>x.replace(/^OT\s+/,'').replace(/\s+OT$/,'');
   const main=t.filter(x=>!isOT(x)),ot=t.filter(isOT).map(strip);return main.length?[...main,...ot]:ot}
-function fixOTLabels(d){try{for(const mo of Object.values(d.months||{}))for(const k of Object.keys(mo)){const v=mo[k];if(Array.isArray(v)&&v.some(x=>/^OT\s+\S/i.test(String(x).trim())))mo[k]=normDuty(v)}
-  for(const c of Object.values(d.changes||{}))if(c&&Array.isArray(c.neu)&&c.neu.some(x=>/^OT\s+\S/i.test(String(x).trim())))c.neu=normDuty(c.neu)}catch(e){}return d}
+function dutyText(neu,y,m,d){try{const p=parseDay(neu);if(p.shifts.length<2)return neu.join(' / ');const it=p.shifts.map((c,i)=>{const sp=shiftSpan(c,y,m,d);return {t:(i?'OT ':'')+((p.labels&&p.labels[i])||c),st:sp?+sp[0]:i}});it.sort((a,b)=>a.st-b.st);return it.map(x=>x.t).join(' / ')}catch(e){return neu.join(' / ')}}
+function fixOTLabels(d){try{for(const mo of Object.values(d.months||{}))for(const k of Object.keys(mo)){const v=mo[k];if(Array.isArray(v)&&v.some(x=>/^OT\s+\S|\S\s+OT$/i.test(String(x).trim())))mo[k]=normDuty(v)}
+  for(const c of Object.values(d.changes||{}))if(c&&Array.isArray(c.neu)&&c.neu.some(x=>/^OT\s+\S|\S\s+OT$/i.test(String(x).trim())))c.neu=normDuty(c.neu)}catch(e){}return d}
 function mergeDefaults(d){ fixOTLabels(d); for(const [k,v] of Object.entries(BASE.holidays)) if(!(k in d.holidays)) d.holidays[k]=v; const ek=new Set(d.events.map(e=>e.date+e.title)); BASE.events.forEach(e=>{if(!ek.has(e.date+e.title))d.events.push(e)}); for(const [k,v] of Object.entries(BASE.times)) if(!d.times[k]) d.times[k]=v; return d; }
 try{ const ls = localStorage.getItem(LS_KEY); if(ls){ const d=JSON.parse(ls); if(d){ d.holidays=d.holidays||{}; d.events=d.events||[]; d.times=d.times||{}; S=mergeDefaults(d);} } }catch(e){}
 
@@ -249,7 +250,7 @@ function fh(h){return (Math.round(h*100)/100).toString()}
 function fmtTime(dt,ref){if(!ref)return pad(dt.getHours())+pad(dt.getMinutes());const b=new Date(ref.getFullYear(),ref.getMonth(),ref.getDate());const mins=Math.round((dt-b)/60000);return pad(Math.floor(mins/60))+pad(mins%60)}
 function fmtSpan(st,en,ref,sep){ref=ref||st;return fmtTime(st,ref)+(sep||'–')+fmtTime(en,ref)}
 function tSpan(t){const a=t[0].replace(':',''),b=t[1].replace(':','');return a+'–'+(b<=a?String(+b.slice(0,2)+24)+b.slice(2):b)}
-function spanText(r){return r.spans.map(s=>hhmm(s[0],r.y,r.mo,r.d)+'–'+hhmm(s[1],r.y,r.mo,r.d)).join(', ')}
+function spanText(r){return r.spans.slice().sort((a,b)=>a[0]-b[0]).map(s=>hhmm(s[0],r.y,r.mo,r.d)+'–'+hhmm(s[1],r.y,r.mo,r.d)).join(', ')}
 
 // ---- next shift ----
 function upcoming(){
@@ -395,7 +396,7 @@ document.addEventListener('input',e=>{if(e.target&&e.target.id==='sn'){const x=s
 function teamFor(k){return ((S.team&&S.team[k])||(typeof TEAM!=='undefined'&&TEAM[k])||[])}
 function swapCodes(){return [...Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b,undefined,{numeric:true}):isPagi(a)?-1:1)),'OFF','REST']}
 function swapUI(ch,d){
-  const cur0=ch&&ch.type==='swap'?ch.neu.join(' / '):'';const codes=swapCodes();const isLain=cur0&&!codes.includes(cur0);
+  const [sy,sm]=cur.split('-').map(Number);const cur0=ch&&ch.type==='swap'?dutyText(ch.neu,sy,sm,d):'';const codes=swapCodes();const isLain=cur0&&!codes.includes(cur0);
   const me=shortId(S.staffNo);
   const team=teamFor(cur).filter(x=>String(x.id).replace(/^0+/,'')!==me).slice().sort((a,b)=>a.name.localeCompare(b.name));
   const w0=ch&&ch.with||'';const wIn=team.some(x=>`${x.name} (${x.id})`===w0);
@@ -467,7 +468,7 @@ function renderCal(y,m){
     else if(r.oh&&!r.shifts.length) inner=`<div class="code p-off">OH</div><div class="t">Office hour</div>`;
     else{
       /* OT dipanggil supervisor: ganti pil "X OT" dengan "☎ OT X" di atas; semua tanda OT diletak atas, sebelum masa */
-      r.shifts.forEach((c,i)=>{if(r.called&&i>0)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${esc((r.labels&&r.labels[i])||c)}</div>`;else inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${esc((r.labels&&r.labels[i])||c)}${r.shifts.length>1&&i>0?' OT':''}</div>`});
+      r.shifts.map((c,i)=>({c,i,st:r.spans[i]?+r.spans[i][0]:i})).sort((a,b)=>r.called?a.i-b.i:a.st-b.st).forEach(({c,i})=>{const lb=esc((r.labels&&r.labels[i])||c);if(r.called&&i>0)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${lb}</div>`;else inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${i>0?'OT ':''}${lb}</div>`});
       r.ot.filter(o=>o.mtype==='cover').forEach(o=>{inner+=`<div class="code p-ev" title="OT Cover Meal Break${o.note?' · '+esc(o.note):''}">OT Meal ${hhmm(o.st,r.y,r.mo,r.d)}–${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='signoff').forEach(o=>{inner+=`<div class="code p-ev" title="Exceed sign off${o.note?' · '+esc(o.note):''}">⏱ Sign off ${hhmm(o.en,r.y,r.mo,r.d)}</div>`});
       r.ot.filter(o=>o.mtype==='ops').forEach(o=>{const aw=/awal/.test(o.kind);inner+=`<div class="code p-ev" title="${esc(o.kind)}${o.note?' · '+esc(o.note):''}">⚑ OPS ${aw?'awal':'lewat'}</div>`});
@@ -556,7 +557,7 @@ function renderCuti(){
   let h=`<div class="row" style="gap:6px;margin-bottom:12px"><button class="btn ${ctab==='swap'?'primary':''}" style="flex:1" data-ctab="swap">⇄ Tukar Shift</button><button class="btn ${ctab==='leave'?'primary':''}" style="flex:1" data-ctab="leave">Cuti</button></div>`;
   h+=ctab==='swap'?`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[cm-1]} ${cy}</h2><button class="btn" data-mnav="1">›</button></div>`:`<div class="monthbar"><button class="btn" data-ynav="-1">‹</button><h2>Tahun ${y}</h2><button class="btn" data-ynav="1">›</button></div>`;
   const item=([k,c])=>{const [yy,mm,dd]=k.split('-').map(Number);
-    return `<div class="item"><span><span class="pill ${c.type==='swap'?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`};
+    return `<div class="item"><span><span class="pill ${c.type==='swap'?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.type==='swap'?dutyText(c.neu,yy,mm,dd):c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`};
   if(ctab==='swap'){
     h+=`<div class="card"><b>Tukar shift ${BULAN[cm-1]} (${mSw.length})</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih Tukar shift.</p><div class="list">${mSw.length?mSw.map(item).join(''):'<div class="note" style="padding:10px 0">Tiada tukar shift bulan ni.</div>'}</div></div>`;
   }else{
@@ -1168,7 +1169,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-23.4';
+const APP_VERSION='2026-11-23.5';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
