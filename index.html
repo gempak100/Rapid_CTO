@@ -496,7 +496,7 @@ function renderClaim(){
   const miss=[...new Set(rows.flatMap(r=>r.missing))];
   if(miss.length)h+=`<div class="warn">Waktu untuk ${miss.join(', ')} belum diisi. Elaun tetap dikira, tapi jam OT tak boleh dikira. Isi di tab Tetapan.</div>`;
   h+=`
-  <div class="row"><button class="btn primary" id="dlform">Cetak Tugasan Harian</button></div>
+  <div class="row"><button class="btn primary" id="dlform">Cetak Tugasan Harian</button><button class="btn" id="dlxl">Muat turun Excel</button></div>
   <p class="note">Borang Claim OT ikut format <i>Application for Overtime / Allowance</i>: waktu kerja ikut masa shift penuh, OT dijumlahkan dalam satu petak, masa lepas tengah malam ditulis 24xx.</p>`;
   return h;
 }
@@ -857,19 +857,194 @@ function printChecks(){
   if(fut.length)W.push({t:`Hari belum berlaku: ${rng(fut)} ${bl}`,d:'Claim untuk hari ini dikira ikut roster. Pastikan tiada perubahan sebelum hantar.'});
   return W;
 }
-function dlForm(){
-  const W=printChecks();if(!W.length)return doDlForm();
+function dlForm(kind){
+  kind=kind||'pdf';const W=printChecks();if(!W.length)return doDlForm(kind);
   const md=document.createElement('div');md.className='modal';const fixT=W.some(w=>w.fix==='tetapan');
   md.innerHTML=`<div class="card"><b>Semak sebelum cetak</b><p class="note">Ada ${W.length} perkara yang perlu diberi perhatian:</p>
   <div class="list">${W.map(w=>`<div class="item" style="display:block"><b style="text-transform:none">⚠ ${esc(w.t)}</b><div class="note">${esc(w.d)}</div></div>`).join('')}</div>
   <div class="row" style="margin-top:14px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" id="pcX">Batal</button>${fixT?'<button class="btn" id="pcF">Betulkan di Tetapan</button>':''}<button class="btn primary" id="pcG">Cetak juga</button></div></div>`;
   document.body.appendChild(md);
-  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='pcX')md.remove();else if(e.target.id==='pcF'){md.remove();view='tetapan';render()}else if(e.target.id==='pcG'){md.remove();doDlForm()}});
+  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='pcX')md.remove();else if(e.target.id==='pcF'){md.remove();view='tetapan';render()}else if(e.target.id==='pcG'){md.remove();doDlForm(kind)}});
 }
-async function doDlForm(){
+/* ===== PDF: lukis borang terus dari Excel yang dijana (A4 landskap, depan 1–15, belakang 16–31) ===== */
+const IDXC=['000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','800000','008000','000080','808000','800080','008080','C0C0C0','808080','9999FF','993366','FFFFCC','CCFFFF','660066','FF8080','0066CC','CCCCFF','000080','FF00FF','FFFF00','00FFFF','800080','800000','008080','0000FF','00CCFF','CCFFFF','CCFFCC','FFFF99','99CCFF','FF99CC','CC99FF','FFCC99','3366FF','33CCCC','99CC00','FFCC00','FF9900','FF6600','666699','969696','003366','339966','003300','333300','993300','993366','333399','333333'];
+async function unzipParts(u8){
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);let e=u8.length-22;while(e>0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const out={};const td=new TextDecoder();
+  for(let i=0;i<n;i++){
+    const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    const name=td.decode(u8.subarray(p+46,p+46+nl));const st=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);let data=u8.subarray(st,st+cs);
+    if(m===8)data=new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    out[name]=data;p+=46+nl+xl+cl;
+  }
+  return out;
+}
+const xUnesc=s=>String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,(m,d)=>String.fromCharCode(+d)).replace(/&amp;/g,'&');
+const attr=(s,a)=>{const m=s.match(new RegExp('\\b'+a+'="([^"]*)"'));return m?m[1]:null};
+function pdfColor(s,theme){ // s: elemen <color .../> atau <fgColor .../>
+  if(!s)return null;let c=null;const rgb=attr(s,'rgb'),th=attr(s,'theme'),ix=attr(s,'indexed');
+  if(rgb)c=rgb.slice(-6);else if(th!=null)c=theme[+th]||'000000';else if(ix!=null){const i=+ix;c=i===64?'000000':i===65?'FFFFFF':(IDXC[i]||'000000')}
+  if(!c)return null;const t=+(attr(s,'tint')||0);
+  if(t){c=[0,2,4].map(i=>{let v=parseInt(c.substr(i,2),16);v=t<0?v*(1+t):v+(255-v)*t;return Math.round(v).toString(16).padStart(2,'0')}).join('')}
+  return '#'+c;
+}
+function pdfFont(s,theme){return {b:/<b\/>|<b val="(1|true)"\/>/.test(s),i:/<i\/>|<i val="(1|true)"\/>/.test(s),sz:+(attr((s.match(/<sz [^>]*>/)||[''])[0],'val')||11),name:attr((s.match(/<(?:name|rFont) [^>]*>/)||[''])[0],'val')||'Calibri',color:pdfColor((s.match(/<color [^>]*>/)||[''])[0],theme)||'#000000'}}
+function parseRuns(si,theme,base){
+  const runs=[...si.matchAll(/<r>([\s\S]*?)<\/r>/g)];
+  if(!runs.length){const t=[...si.matchAll(/<t(?: [^>]*)?>([\s\S]*?)<\/t>/g)].map(m=>m[1]).join('');return [{t:xUnesc(t),f:null}]}
+  return runs.map(m=>{const rp=(m[1].match(/<rPr>([\s\S]*?)<\/rPr>/)||[,''])[1];const t=(m[1].match(/<t(?: [^>]*)?>([\s\S]*?)<\/t>/)||[,''])[1];return {t:xUnesc(t),f:rp?pdfFont(rp,theme):null}});
+}
+const FAM={'arial narrow':'"Arial Narrow","Liberation Sans Narrow","Roboto Condensed","sans-serif-condensed",Arial,sans-serif',tahoma:'Tahoma,Verdana,"DejaVu Sans",Arial,sans-serif',calibri:'Calibri,Carlito,Arial,sans-serif',arial:'Arial,"Liberation Sans",Helvetica,sans-serif'};
+let _narrowScale=null;
+function famOf(n){return FAM[(n||'').toLowerCase()]||(`"${n}",Arial,sans-serif`)}
+function narrowScale(ctx){ // jika tiada font sempit di peranti, mampatkan Arial 82% (sama lebar Arial Narrow)
+  if(_narrowScale==null){ctx.save();ctx.font='bold 20px '+FAM['arial narrow'];const a=ctx.measureText('ABCDEFGHIJKLMNOP').width;ctx.font='bold 20px Arial,sans-serif';const b=ctx.measureText('ABCDEFGHIJKLMNOP').width;ctx.restore();_narrowScale=a/b>0.9?0.82:1}
+  return _narrowScale;
+}
+function setF(ctx,f){ctx.font=`${f.i?'italic ':''}${f.b?'bold ':''}${f.sz}px ${famOf(f.name)}`;ctx.fillStyle=f.color||'#000';return /narrow/i.test(f.name||'')?narrowScale(ctx):1}
+function runW(ctx,r){const k=setF(ctx,r.f);return ctx.measureText(r.t).width*k}
+function drawRun(ctx,r,x,y){const k=setF(ctx,r.f);if(k!==1){ctx.save();ctx.translate(x,y);ctx.scale(k,1);ctx.fillText(r.t,0,0);ctx.restore()}else ctx.fillText(r.t,x,y);return ctx.measureText(r.t).width*k}
+function fmtNum(v,nf){const n=+v;if(!isFinite(n))return String(v);if(nf===2||nf===4)return n.toFixed(2);if(nf===167)return n.toFixed(1);if(nf===1||nf===3)return String(Math.round(n));return String(Math.round(n*1e9)/1e9)}
+
+async function claimPdf(xlsx){
+  const P=await unzipParts(xlsx);const td=new TextDecoder();const T=n=>P[n]?td.decode(P[n]):'';
+  const thx=T('xl/theme/theme1.xml');const cl=k=>{const m=thx.match(new RegExp('<a:'+k+'>[\\s\\S]*?(?:lastClr|val)="([0-9A-Fa-f]{6})"'));return m?m[1]:'000000'};
+  const theme=[cl('lt1'),cl('dk1'),cl('lt2'),cl('dk2'),cl('accent1'),cl('accent2'),cl('accent3'),cl('accent4'),cl('accent5'),cl('accent6'),cl('hlink'),cl('folHlink')];
+  const st=T('xl/styles.xml');
+  const fonts=[...st.match(/<fonts[^>]*>([\s\S]*?)<\/fonts>/)[1].matchAll(/<font>([\s\S]*?)<\/font>|<font\/>/g)].map(m=>pdfFont(m[1]||'',theme));
+  const fills=[...st.match(/<fills[^>]*>([\s\S]*?)<\/fills>/)[1].matchAll(/<fill>([\s\S]*?)<\/fill>/g)].map(m=>/patternType="solid"/.test(m[1])?pdfColor((m[1].match(/<fgColor [^>]*>/)||[''])[0],theme):null);
+  const borders=[...st.match(/<borders[^>]*>([\s\S]*?)<\/borders>/)[1].matchAll(/<border(?: [^>]*)?>([\s\S]*?)<\/border>|<border\/>/g)].map(m=>{const b={};for(const sd of ['left','right','top','bottom']){const mm=(m[1]||'').match(new RegExp('<'+sd+' style="(\\w+)"[^>]*?(?:/>|>([\\s\\S]*?)</'+sd+'>)'));if(mm)b[sd]={s:mm[1],c:pdfColor((mm[2]||'').match(/<color [^>]*>/)?.[0],theme)||'#000'}}return b});
+  const xfs=[...st.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/)[1].matchAll(/<xf ([^>]*?)(?:\/>|>([\s\S]*?)<\/xf>)/g)].map(m=>{const al=(m[2]||'').match(/<alignment [^>]*>/)?.[0]||'';return {f:+(attr(m[1],'fontId')||0),fi:+(attr(m[1],'fillId')||0),b:+(attr(m[1],'borderId')||0),nf:+(attr(m[1],'numFmtId')||0),h:attr(al,'horizontal')||'general',v:attr(al,'vertical')||'bottom',wrap:attr(al,'wrapText')==='1',rot:+(attr(al,'textRotation')||0)}});
+  const ss=[...T('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m=>parseRuns(m[1],theme));
+  const wb=T('xl/workbook.xml');const sheetName='OT V1';
+  const sh=T('xl/worksheets/sheet2.xml');
+  const sfp=sh.match(/<sheetFormatPr [^>]*>/)?.[0]||'';const defW=+(attr(sfp,'defaultColWidth')||8.43),defH=+(attr(sfp,'defaultRowHeight')||15);
+  const colPx=w=>Math.trunc(((256*w+Math.trunc(128/7))/256)*7);
+  const pa=(wb.match(/_xlnm\.Print_Area" localSheetId="1">[^<]*\$([A-Z]+)\$(\d+):\$([A-Z]+)\$(\d+)/)||[0,'A','1','U','54']);
+  const cN=s=>[...s].reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0);
+  const c1=cN(pa[1]),r1=+pa[2],c2=cN(pa[3]),r2=+pa[4];
+  const cw={};for(const m of sh.matchAll(/<col [^>]*>/g)){const a=+attr(m[0],'min'),b=+attr(m[0],'max'),w=attr(m[0],'hidden')==='1'?0:+attr(m[0],'width');for(let c=a;c<=b;c++)cw[c]=w}
+  const colW=c=>(cw[c]==null?colPx(defW):cw[c]===0?0:colPx(cw[c]))*0.75; // pt
+  const rh={},cells={};
+  for(const rm of sh.matchAll(/<row ([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)){
+    const r=+attr(rm[1],'r');rh[r]=attr(rm[1],'hidden')==='1'?0:(attr(rm[1],'ht')!=null?+attr(rm[1],'ht'):defH);
+    for(const cm of (rm[2]||'').matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+      const ref=attr(cm[1],'r');const s=+(attr(cm[1],'s')||0);const t=attr(cm[1],'t');const body=cm[2]||'';let runs=null;
+      if(t==='s'){const v=body.match(/<v>(\d+)<\/v>/);if(v)runs=ss[+v[1]]}
+      else if(t==='inlineStr'){const is=body.match(/<is>([\s\S]*?)<\/is>/);if(is)runs=parseRuns(is[1],theme)}
+      else{const v=body.match(/<v>([\s\S]*?)<\/v>/);if(v&&v[1]!==''){const raw=xUnesc(v[1]);runs=[{t:(t==='str'||t==='e'||t==='b')?raw:fmtNum(raw,xfs[s]?.nf),f:null,num:!t||t==='n'}]}}
+      if(runs&&runs.every(r=>r.t===''))runs=null;
+      cells[ref]={s,runs};
+    }
+  }
+  const rowH=r=>(rh[r]!=null?rh[r]:defH);
+  const merges=[...sh.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/g)].map(m=>({c1:cN(m[1]),r1:+m[2],c2:cN(m[3]),r2:+m[4]}));
+  const mergeAt={},inMerge={},mergeOf={};merges.forEach(g=>{mergeAt[g.c1+','+g.r1]=g;for(let r=g.r1;r<=g.r2;r++)for(let c=g.c1;c<=g.c2;c++){mergeOf[c+','+r]=g;if(r!==g.r1||c!==g.c1)inMerge[c+','+r]=1}});
+  const colName=c=>{let s='';while(c>0){const m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=Math.floor((c-1)/26)}return s};
+  // halaman: ikut rowBreaks + print titles
+  const brk=[...sh.matchAll(/<brk id="(\d+)"/g)].map(m=>+m[1]).filter(b=>b>=r1&&b<r2).sort((a,b)=>a-b);
+  const pt=wb.match(/_xlnm\.Print_Titles" localSheetId="1">[^<]*\$(\d+):\$(\d+)/);const tA=pt?+pt[1]:0,tB=pt?+pt[2]:-1;
+  const pages=[];let s0=r1;for(const b of [...brk,r2]){const rows=[];for(let r=s0;r<=b;r++)rows.push(r);if(pages.length&&tA)for(let r=tB;r>=tA;r--)if(!rows.includes(r))rows.unshift(r);pages.push(rows);s0=b+1}
+  pages.forEach(rows=>rows.sort((a,b)=>a-b));
+  // gambar (logo + tandatangan)
+  const drw=T('xl/drawings/drawing1.xml'),drel=T('xl/drawings/_rels/drawing1.xml.rels');const imgs=[];
+  for(const am of drw.matchAll(/<xdr:(twoCellAnchor|oneCellAnchor)[^>]*>([\s\S]*?)<\/xdr:\1>/g)){
+    const g=(blk,tag)=>+((am[2].match(new RegExp('<xdr:'+blk+'>[\\s\\S]*?<xdr:'+tag+'>(\\d+)</xdr:'+tag+'>'))||[,0])[1]);
+    const rid=(am[2].match(/r:embed="([^"]+)"/)||[])[1];const tgt=(drel.match(new RegExp('Id="'+rid+'"[^>]*Target="([^"]+)"'))||drel.match(new RegExp('Target="([^"]+)"[^>]*Id="'+rid+'"'))||[])[1];if(!tgt)continue;
+    const path='xl/'+tgt.replace('../','');if(!P[path])continue;
+    const ext=am[2].match(/<xdr:ext cx="(\d+)" cy="(\d+)"/);
+    imgs.push({fc:g('from','col')+1,fco:g('from','colOff')/12700,fr:g('from','row')+1,fro:g('from','rowOff')/12700,two:am[1]==='twoCellAnchor',tc:g('to','col')+1,tco:g('to','colOff')/12700,tr:g('to','row')+1,tro:g('to','rowOff')/12700,cx:ext?+ext[1]/12700:0,cy:ext?+ext[2]/12700:0,path});
+  }
+  const bmp={};for(const im of imgs)if(!bmp[im.path])bmp[im.path]=await createImageBitmap(new Blob([P[im.path]],{type:/png$/i.test(im.path)?'image/png':'image/jpeg'}));
+  const foot=xUnesc((sh.match(/<oddFooter>([\s\S]*?)<\/oddFooter>/)||[,''])[1]);
+  const pm=sh.match(/<pageMargins [^>]*>/)?.[0]||'';const mg=k=>+(attr(pm,k)||0.5)*72;
+  const ps=sh.match(/<pageSetup [^>]*>/)?.[0]||'';const scale=+(attr(ps,'scale')||100)/100;const land=attr(ps,'orientation')==='landscape';
+  const PW=land?842:595,PH=land?595:842;const hc=/horizontalCentered="1"/.test(sh),vc=/verticalCentered="1"/.test(sh);
+  const colX={};let acc=0;for(let c=c1;c<=c2+1;c++){colX[c]=acc;acc+=colW(c)}const totW=colX[c2+1];
+  const DPI=200,K=DPI/72;const out=[];
+  for(const rows of pages){
+    const cv=document.createElement('canvas');cv.width=Math.round(PW*K);cv.height=Math.round(PH*K);const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.scale(K,K);ctx.textBaseline='alphabetic';
+    const rowY={};let y=0;for(const r of rows){rowY[r]=y;y+=rowH(r)}const totH=y;
+    const avW=PW-mg('left')-mg('right'),avH=PH-mg('top')-mg('bottom');
+    const ox=mg('left')+(hc?(avW-totW*scale)/2:0),oy=mg('top')+(vc?(avH-totH*scale)/2:0);
+    ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+    const rectOf=(c,r)=>{const g=mergeAt[c+','+r];if(g){let h=0;for(let rr=g.r1;rr<=g.r2;rr++)h+=rows.includes(rr)?rowH(rr):0;return {x:colX[c],y:rowY[r],w:colX[Math.min(g.c2,c2)+1]-colX[c],h}}return {x:colX[c],y:rowY[r],w:colW(c),h:rowH(r)}};
+    // 1) isi warna
+    for(const r of rows)for(let c=c1;c<=c2;c++){if(inMerge[c+','+r])continue;const ce=cells[colName(c)+r];if(!ce)continue;const fc=fills[xfs[ce.s]?.fi];if(fc){const R=rectOf(c,r);ctx.fillStyle=fc;ctx.fillRect(R.x,R.y,R.w,R.h)}}
+    // 2) teks
+    const empty=(c,r)=>{const ce=cells[colName(c)+r];return !ce||!ce.runs};
+    for(const r of rows)for(let c=c1;c<=c2;c++){
+      if(inMerge[c+','+r])continue;const ce=cells[colName(c)+r];if(!ce||!ce.runs)continue;
+      const x=xfs[ce.s]||{f:0,h:'general',v:'bottom'};const base=fonts[x.f]||fonts[0];const R=rectOf(c,r);if(!R.h||!R.w)continue;
+      const runs=ce.runs.map(q=>({t:q.t,f:q.f?{...base,...q.f,color:q.f.color||base.color}:base,num:q.num}));
+      const isNum=runs.length===1&&runs[0].num;const h=x.h==='general'?(isNum?'right':'left'):(x.h==='centerContinuous'?'center':x.h);
+      const pad=1.5;
+      ctx.save();
+      if(x.rot===90||x.rot===180){
+        const f=runs[0].f;const w=runW(ctx,runs[0]);ctx.beginPath();ctx.rect(R.x,R.y,R.w,R.h);ctx.clip();
+        ctx.translate(R.x+R.w/2+f.sz*0.35,R.y+R.h/2+w/2);ctx.rotate(-Math.PI/2);drawRun(ctx,runs[0],0,0);ctx.restore();continue;
+      }
+      // baris (wrap)
+      let lines=[];
+      if(runs.length===1){const f=runs[0].f;const parts=runs[0].t.split('\n');const maxW=R.w-2*pad;
+        for(const para of parts){if(!x.wrap){lines.push([{t:para,f}]);continue}const words=para.split(' ');let cur='';
+          for(const w of words){const tst=cur?cur+' '+w:w;if(cur&&runW(ctx,{t:tst,f})>maxW){lines.push([{t:cur,f}]);cur=w}else cur=tst}lines.push([{t:cur,f}])}}
+      else lines=[runs];
+      const lh=l=>Math.max(...l.map(q=>q.f.sz))*1.2;const totLH=lines.reduce((a,l)=>a+lh(l),0);
+      let yy=x.v==='top'?R.y+1:x.v==='center'?R.y+(R.h-totLH)/2:R.y+R.h-totLH-1;
+      // limpah ke petak kosong sebelah (teks tidak dibalut)
+      let clipX=R.x,clipW=R.w;
+      if(!x.wrap&&!mergeAt[c+','+r]&&h==='left'){let cc=c+1;while(cc<=c2&&empty(cc,r)&&!inMerge[cc+','+r]&&!mergeAt[cc+','+r]){clipW+=colW(cc);cc++}}
+      ctx.beginPath();ctx.rect(clipX,R.y,clipW,R.h);ctx.clip();
+      for(const l of lines){const lw=l.reduce((a,q)=>a+runW(ctx,q),0);let xx=h==='center'?R.x+(R.w-lw)/2:h==='right'?R.x+R.w-pad-lw:R.x+pad;
+        const base_y=yy+lh(l)*0.8;for(const q of l)xx+=drawRun(ctx,q,xx,base_y);yy+=lh(l)}
+      ctx.restore();
+    }
+    // 3) garisan
+    const LW={hair:0.3,thin:0.6,medium:1.3,thick:2,double:0.4,dotted:0.6,dashed:0.6,mediumDashed:1.2,dashDot:0.6};
+    const line=(b,x1,y1,x2,y2)=>{if(!b)return;ctx.strokeStyle=b.c||'#000';ctx.lineWidth=LW[b.s]||0.6;ctx.setLineDash(b.s==='dotted'?[0.8,0.8]:/dash/i.test(b.s)?[3,1.5]:[]);
+      if(b.s==='double'){const v=y1===y2;for(const d of [-0.7,0.7]){ctx.beginPath();ctx.moveTo(x1+(v?0:d),y1+(v?d:0));ctx.lineTo(x2+(v?0:d),y2+(v?d:0));ctx.stroke()}}
+      else{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}};
+    for(const r of rows)for(let c=c1;c<=c2;c++){const ce=cells[colName(c)+r];if(!ce)continue;const b=borders[xfs[ce.s]?.b];if(!b)continue;
+      const X=colX[c],Y=rowY[r],W=colW(c),H=rowH(r);const g=mergeOf[c+','+r]; /* dalam petak bercantum, hanya garisan tepi luar dilukis */
+      if(!g||r===g.r1)line(b.top,X,Y,X+W,Y);if(!g||r===g.r2)line(b.bottom,X,Y+H,X+W,Y+H);if(!g||c===g.c1)line(b.left,X,Y,X,Y+H);if(!g||c===g.c2)line(b.right,X+W,Y,X+W,Y+H)}
+    ctx.setLineDash([]);
+    // 4) gambar
+    for(const im of imgs){if(rowY[im.fr]==null)continue;const x0=colX[im.fc]+im.fco,y0=rowY[im.fr]+im.fro;let w=im.cx,h=im.cy;
+      if(im.two&&rowY[im.tr]!=null){w=colX[im.tc]+im.tco-x0;h=rowY[im.tr]+im.tro-y0}if(w>0&&h>0)ctx.drawImage(bmp[im.path],x0,y0,w,h)}
+    ctx.restore();
+    // 5) footer
+    if(foot){const m=foot.match(/&R(?:&(\d+))?(.*)$/);if(m){const f={b:false,sz:+(m[1]||9),name:'Arial',color:'#000'};setF(ctx,f);const t=m[2].replace(/&[A-Z]/g,'');ctx.fillText(t,PW-mg('right')-ctx.measureText(t).width,PH-mg('footer'))}}
+    const jpg=await new Promise(res=>cv.toBlob(b=>b.arrayBuffer().then(a=>res(new Uint8Array(a))),'image/jpeg',0.9));
+    out.push({jpg,w:cv.width,h:cv.height});
+  }
+  return makePdf(out,PW,PH);
+}
+function makePdf(pages,PW,PH){
+  const enc=new TextEncoder();const chunks=[];let off=0;const xref=[];
+  const put=b=>{const u=typeof b==='string'?enc.encode(b):b;chunks.push(u);off+=u.length};
+  const obj=(id,body)=>{xref[id]=off;put(`${id} 0 obj\n`);(Array.isArray(body)?body:[body]).forEach(put);put('\nendobj\n')};
+  put('%PDF-1.4\n');put(new Uint8Array([37,226,227,207,211,10]));
+  const n=pages.length;const kids=pages.map((_,i)=>`${3+i*3} 0 R`).join(' ');
+  obj(1,'<< /Type /Catalog /Pages 2 0 R >>');obj(2,`<< /Type /Pages /Kids [${kids}] /Count ${n} >>`);
+  pages.forEach((p,i)=>{const pid=3+i*3,cid=pid+1,iid=pid+2;const cs=`q ${PW} 0 0 ${PH} 0 0 cm /Im${i} Do Q`;
+    obj(pid,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im${i} ${iid} 0 R >> >> /Contents ${cid} 0 R >>`);
+    obj(cid,[`<< /Length ${cs.length} >>\nstream\n`,cs,'\nendstream']);
+    obj(iid,[`<< /Type /XObject /Subtype /Image /Width ${p.w} /Height ${p.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpg.length} >>\nstream\n`,p.jpg,'\nendstream'])});
+  const total=3+n*3;const xo=off;let x=`xref\n0 ${total}\n0000000000 65535 f \n`;for(let i=1;i<total;i++)x+=String(xref[i]).padStart(10,'0')+' 00000 n \n';
+  put(x);put(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xo}\n%%EOF\n`);
+  const out=new Uint8Array(off);let q=0;for(const c of chunks){out.set(c,q);q+=c.length}return out;
+}
+async function doDlForm(kind){
   if(!cap.downloads){toast('Muat turun tak tersedia di paparan ni');return}
-  const [y,m]=cur.split('-').map(Number);
-  try{await cap.downloads.save({filename:`Claim_OT_${BULAN_EN[m-1]}_${y}_${shortId(S.staffNo)?10000000+ +shortId(S.staffNo):S.staffNo}.xlsx`,data:buildClaimForm(cur)})}catch(e){if(e&&e.code!=='declined')toast('Tak dapat muat turun: '+(e.code||'ralat'))}
+  const [y,m]=cur.split('-').map(Number);const base=`Claim_OT_${BULAN_EN[m-1]}_${y}_${shortId(S.staffNo)?10000000+ +shortId(S.staffNo):S.staffNo}`;
+  try{
+    const xl=buildClaimForm(cur);
+    if(kind==='xlsx'){await cap.downloads.save({filename:base+'.xlsx',data:xl});return}
+    toast('Menyediakan PDF…');const pdf=await claimPdf(xl);
+    await cap.downloads.save({filename:base+'.pdf',data:pdf});
+  }catch(e){if(e&&e.code==='declined')return;console.error(e);toast('Tak dapat sediakan fail: '+((e&&(e.code||e.message))||'ralat'))}
 }
 
 // ---- roster reading via Claude ----
@@ -950,7 +1125,7 @@ function dlIcs(){
 root.addEventListener('change',e=>{if(e.target.id==='bkLoad'&&e.target.files[0])loadBackup(e.target.files[0])});
 // ---- events ----
 root.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-ctab],[data-quick],[data-mnav],[data-ynav],[data-day],[data-msg],[data-undo],#saveEnt,#cpyot,#dlform,#dlx,#dlc,#cpy,#saveSet,#fillRoster,#bkSave,#dlics,#lgGo,#rsSync,#rsOut,#updChk');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-ctab],[data-quick],[data-mnav],[data-ynav],[data-day],[data-msg],[data-undo],#saveEnt,#cpyot,#dlform,#dlxl,#dlx,#dlc,#cpy,#saveSet,#fillRoster,#bkSave,#dlics,#lgGo,#rsSync,#rsOut,#updChk');if(!t)return;
   if(t.id==='updChk'){checkUpdate(true);return}
   if(t.dataset.quick){openQuick(t.dataset.quick);return}
   if(t.dataset.ctab){ctab=t.dataset.ctab;render();return}
@@ -961,7 +1136,8 @@ root.addEventListener('click',e=>{
   if(t.dataset.tab){view=t.dataset.tab;render()}
   else if(t.dataset.mnav){cur=shiftMonth(cur,+t.dataset.mnav);render()}
   else if(t.dataset.day)openDay(+t.dataset.day);
-  else if(t.id==='dlform')dlForm();
+  else if(t.id==='dlform')dlForm('pdf');
+  else if(t.id==='dlxl')dlForm('xlsx');
   else if(t.id==='dlx')dl('xlsx');else if(t.id==='dlc')dl('csv');else if(t.id==='cpy')copySum();
   else if(t.id==='fillRoster')fillRoster();
   else if(t.id==='lgGo')doLogin();
@@ -984,7 +1160,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-23.1';
+const APP_VERSION='2026-11-23.2';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
