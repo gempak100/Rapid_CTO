@@ -630,11 +630,13 @@ function openDay(d){
       if(el.dataset.raw){const v=norm24(el.dataset.raw,el);if(v)el.value=v;}}); }
   bindSwap(md);
   const ctoTouched=false; /* kotak Tuntut CTO dibuang: CTO ikut hari kerja sahaja */
+  ['#exS','#exE'].forEach(q=>{const el=md.querySelector(q);if(el)el.addEventListener('input',()=>{el.dataset.touched='1'})});
   md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='dx')md.remove();
     const dot=e.target.closest('[data-delot]');if(dot){const a=S.otManual[ck]||[];a.splice(+dot.dataset.delot,1);if(!a.length)delete S.otManual[ck];md.remove();render();save('OT dibuang');return}
     const del=e.target.closest('[data-delev]');if(del){const k=dkey(y,m,d);S.events=S.events.filter(x=>!(x.date===k&&x.title===del.dataset.delev));md.remove();render();save('Event dibuang')}});
   md.querySelector('#ds').onclick=()=>{
+    const prevSlots=JSON.stringify((S.months[cur]||{})[d]||[]);
     let v=md.querySelector('#dv').value.split('/').map(s=>s.trim().toUpperCase()).filter(Boolean);
     const typ=md.querySelector('input[name=chg]:checked').value;
     const orig=ch?ch.orig:v;
@@ -653,7 +655,7 @@ function openDay(d){
     if(!parseDay(v).shifts.length)odv=''; /* OFF/REST/cuti: tak boleh dipanggil OT */
     if(odv&&parseDay(v).shifts.length>1&&!(S.otDuty[ck]&&v.includes(S.otDuty[ck]))){toast('Hari ni dah double shift, tak boleh tambah OT duty lagi');return}
     if(odv)S.otDuty[ck]=odv;else delete S.otDuty[ck];
-    {const xs=md.querySelector('#exS'),xe=md.querySelector('#exE');if(xs&&xe){const nr=x=>{const v=norm24(x.value,x);return v||''};const vs=nr(xs),ve=nr(xe);
+    {const xs=md.querySelector('#exS'),xe=md.querySelector('#exE');if(xs&&xe&&!(xs.dataset.touched||xe.dataset.touched)){if(JSON.stringify(v)!==prevSlots)delete S.excess[ck]; /* shift bertukar: excess ikut duty baru */}else if(xs&&xe){const nr=x=>{const v=norm24(x.value,x);return v||''};const vs=nr(xs),ve=nr(xe);
       const r0=dayCalc(`${y}-${m}`,d);const en=r0.spans[0]&&r0.spans[0][1];const st0=en&&new Date(+en-(+S.claimHour.jam||1)*3600000);
       const def=en&&vs===hhmm(st0,y,m,d).replace(/(\d\d)$/,':$1')&&ve===hhmm(en,y,m,d).replace(/(\d\d)$/,':$1');
       if(!vs||!ve||def)delete S.excess[ck];else S.excess[ck]={st:vs,en:ve};}}
@@ -1160,7 +1162,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-23.2';
+const APP_VERSION='2026-11-23.3';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
