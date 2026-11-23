@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Demo Sebenar · Semakan Claim Leader (Supabase)</title>
+<style>
+:root{--bg:#f5f3ee;--card:#fff;--ink:#1d1b18;--muted:#6f6a61;--line:#e6e1d7;--accent:#1d1b18;
+--ok:#2b8a3e;--ok-bg:#e2f4e5;--wait:#3b5bdb;--wait-bg:#e5eafc;--fix:#c2255c;--fix-bg:#fbe3ec;--none:#8a8378;--none-bg:#efece6;--warn:#e8590c;--warn-bg:#fff0e6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.45}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:1320px;margin:0 auto;padding:18px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13px}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--warn-bg);color:var(--warn);padding:3px 8px;border-radius:999px;margin-bottom:6px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:10px;font-weight:600}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btn.fix{background:var(--fix);color:#fff;border-color:var(--fix)}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+/* langkah demo */
+
+.step{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);font-size:12.5px;color:var(--muted)}
+.step b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px}
+.step .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--none-bg);font-size:11px;font-weight:700;margin-right:6px;color:var(--ink)}
+.step.done{opacity:.6}.step.done .n{background:var(--ok);color:#fff}
+.step.now{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset}.step.now .n{background:var(--ink);color:var(--bg)}
+/* dua panel */
+.views{display:grid;grid-template-columns:minmax(330px,420px) 1fr;gap:16px;align-items:start}
+.seg.switch{display:none}
+.bell i[hidden]{display:none}
+td.num{white-space:nowrap}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:#fbfaf7}
+.ph .who{font-weight:700}.ph .role{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.pb{padding:14px 16px;max-height:calc(100vh - 250px);min-height:520px;overflow:auto}
+.bell{position:relative;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-weight:700}
+.bell i{position:absolute;top:-6px;right:-6px;background:var(--fix);color:#fff;font-style:normal;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+.chip{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.s-draft{background:var(--none-bg);color:var(--none)}.s-sent{background:var(--wait-bg);color:var(--wait)}.s-fix{background:var(--fix-bg);color:var(--fix)}.s-ok{background:var(--ok-bg);color:var(--ok)}.s-req{background:var(--warn-bg);color:var(--warn)}.s-open{background:#efe9fe;color:#7048e8}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;background:var(--card)}
+.seg button{border:0;background:none;padding:5px 10px;border-radius:7px;font-weight:600;color:var(--muted);font-size:12.5px}
+.seg button.on{background:var(--accent);color:var(--bg)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;font-weight:700;padding:6px 6px;border-bottom:1px solid var(--line)}
+td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num,th.num{text-align:center;font-variant-numeric:tabular-nums}
+tr.flag td{background:var(--fix-bg)}
+tr.fixed td{background:var(--ok-bg)}
+.cm{font-size:12px;color:var(--fix);font-weight:600;margin-top:3px}
+.cm.okc{color:var(--ok)}
+.muted{color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.kpi{border:1px solid var(--line);border-radius:12px;padding:10px}
+.kpi .v{font-size:24px;font-weight:800;line-height:1.1}.kpi .l{font-size:11.5px;color:var(--muted);font-weight:600}
+.mem{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer}
+.mem:hover{border-color:var(--ink)}
+.mem.hi{box-shadow:0 0 0 2px var(--wait) inset}
+.mem .nm{font-weight:700}.mem .id{font-size:12px;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sp{flex:1}
+.note{font-size:12.5px;color:var(--muted)}
+.box{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:13px}
+.inp{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px;width:100%}
+.inp.t{width:62px;text-align:center}
+.log{font-size:12px;color:var(--muted);margin:0;padding-left:16px}
+.log li{margin:2px 0}
+.toastz{pointer-events:none;position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50;max-width:360px}
+.toast{background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.18);animation:in .25s ease}
+.toast b{display:block;font-size:11px;letter-spacing:.06em;opacity:.7}
+@keyframes in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.modal{position:fixed;inset:0;background:rgba(20,18,15,.45);display:grid;place-items:center;z-index:40;padding:16px}
+.modal .card{max-width:860px;width:100%;max-height:90vh;overflow:auto;margin:0}
+.inbox{position:absolute;right:12px;top:52px;width:320px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.15);z-index:30;padding:8px}
+.inbox div{padding:8px;border-bottom:1px solid var(--line);font-size:12.5px}.inbox div:last-child{border:0}
+.inbox small{color:var(--muted);display:block}
+.xl{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;border:1px solid #999}
+.xl th,.xl td{border:1px solid #999;padding:3px 4px;color:#111;text-transform:none;letter-spacing:0}
+.xl th{background:#f1f1f1;text-align:center;font-size:10px}
+.xl td{font-weight:700;text-align:center}
+.xl td.k{text-align:center}
+.sig{height:22px;display:block;margin:auto}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(29,27,24,.15)}}
+/* borang sebenar */
+.formwrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}
+.fm{font-family:"Arial Narrow","Liberation Sans Narrow","Roboto Condensed",Arial,sans-serif;color:#111;min-width:900px}
+.fm h2{text-align:center;font-size:17px;margin:2px 0 8px;letter-spacing:.01em}
+.fm .hd{display:grid;grid-template-columns:175px 1fr 95px 1fr;gap:2px 8px;font-size:12px;font-weight:700;margin-bottom:8px}
+.fm table{border-collapse:collapse;width:100%;font-size:10.5px}
+.fm th,.fm td{border:1px solid #333;padding:2px 3px;text-align:center;color:#111;text-transform:none;letter-spacing:0;font-weight:700;vertical-align:middle}
+.fm th{font-size:9px;background:#fff}
+.fm th.y{background:#ffff99}
+.fm td{height:30px}
+.fm tbody td:nth-child(2){white-space:nowrap}
+.fm td.c{cursor:pointer}
+.fm td.c:hover{background:#fff4c2;outline:2px solid #e8a400;outline-offset:-2px}
+.fm tr.fl td{background:#fde2ea}
+.fm td.fc{background:#f7b8c9!important;outline:2px solid var(--fix);outline-offset:-2px}
+.fm tr.fx td{background:#e6f5e8}
+.fm td.le{background:#dbe4ff!important;outline:2px solid var(--wait);outline-offset:-2px}
+.fm tr.leshow td{background:#edf2ff;text-align:left;height:auto;padding:4px 8px;color:var(--wait);font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-weight:600;font-size:11.5px}
+.cm.lec{color:var(--wait)}
+.fm td.ver{width:86px}
+.fm .vflag{color:var(--fix);font-size:10px}
+.fm tr.cmrow td{background:#fff8e1;text-align:left;height:auto;padding:8px;font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-weight:500}
+.fm tr.cmshow td{background:#fde2ea;text-align:left;height:auto;padding:4px 8px;color:var(--fix);font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-weight:600;font-size:11.5px}
+.fm .ft{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-size:12px;margin-top:14px}
+.fm .ft div{min-height:70px}
+.actbar{position:sticky;top:-14px;background:var(--card);z-index:3;padding:8px 0;border-bottom:1px solid var(--line)}
+.views.wide{grid-template-columns:1fr}.views.wide .p-user{display:none}
+@media (max-width:900px){
+  .views{grid-template-columns:1fr}
+  .seg.switch{display:flex;margin-bottom:10px;width:max-content}
+  .views[data-show="user"] .p-leader,.views[data-show="leader"] .p-user{display:none}
+  .steps{grid-template-columns:repeat(2,1fr)}
+  .pb{max-height:none}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+<style>
+.login{max-width:420px;margin:40px auto}
+.acc{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;cursor:pointer;font-size:13px}
+.acc:hover{border-color:var(--ink)}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+.single{max-width:1240px}
+.err{color:var(--fix);font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap single" id="app"></div>
+<div class="toastz" id="toasts"></div>
+<div id="modal"></div>
+<script>
+/* ===== Tetapan Supabase (kunci awam / publishable; selamat kerana RLS) ===== */
+const SUPA_URL='https://hzlphrvhmeucarbhsxap.supabase.co';
+const SUPA_KEY='sb_publishable_5aGK6hRNP3fyHqqOFIFA3A_Lx8dFcZi';
+const EMAIL_DOMAIN='@demo-claim.test';
+const DEMO_ACC=[['10090001','KAMAL BIN ROSLI','Leader'],['10090012','AHMAD FAIZ BIN OMAR','User'],['10090015','SITI NURHALIZA BT RAHMAN','User'],['10090018','MOHD HAKIM BIN YUSOF','User'],['10090024','LIM WEI JIE','User']];
+
+/* ===== Klien REST ringkas (Auth + PostgREST) ===== */
+let SES=null;try{SES=JSON.parse(localStorage.getItem('demo_ses')||'null')}catch(e){}
+function saveSes(s){SES=s;try{s?localStorage.setItem('demo_ses',JSON.stringify(s)):localStorage.removeItem('demo_ses')}catch(e){}}
+async function authToken(body,grant){
+  const r=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=${grant}`,{method:'POST',headers:{apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error_description||j.msg||j.message||'Log masuk gagal');
+  saveSes({at:j.access_token,rt:j.refresh_token,exp:Date.now()+(j.expires_in||3600)*1000-60000,uid:j.user&&j.user.id});return SES;
+}
+async function tok(){if(!SES)throw new Error('auth');if(Date.now()>SES.exp){try{await authToken({refresh_token:SES.rt},'refresh_token')}catch(e){saveSes(null);throw new Error('auth')}}return SES.at}
+async function api(path,opt={}){
+  const t=await tok();
+  const r=await fetch(`${SUPA_URL}/rest/v1/${path}`,{...opt,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+t,'Content-Type':'application/json',...(opt.headers||{})}});
+  if(r.status===401){saveSes(null);throw new Error('auth')}
+  const txt=await r.text();let j=null;try{j=txt?JSON.parse(txt):null}catch(e){}
+  if(!r.ok)throw new Error((j&&(j.message||j.hint))||('Ralat '+r.status));
+  return j;
+}
+const rpc=(fn,args={})=>api('rpc/'+fn,{method:'POST',body:JSON.stringify(args)});
+
+/* ===== Keadaan ===== */
+const S={per:'H1',open:null,commenting:null,draftCm:'',editing:null,me:null,profiles:[],claims:[],rows:[],edits:[],logs:[],notif:[],inbox:false,busy:false,wide:false,seenNotif:null,reqWhy:''};
+const PERIODS={H1:{label:'Separuh bulan (1–15 Nov)',due:'15 Nov'},H2:{label:'Hujung bulan (16–30 Nov)',due:'30 Nov'}};
+const STL={draft:['Belum hantar','s-draft'],sent:['Menunggu semakan','s-sent'],fix:['Perlu betul','s-fix'],ok:['Disahkan 🔒','s-ok'],req:['Minta ubah','s-req'],open:['Dibuka untuk ubah','s-open']};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const chip=s=>`<span class="chip ${STL[s][1]}">${STL[s][0]}</span>`;
+const SIG=`<svg class="sig" viewBox="0 0 120 40"><path d="M6 30c8-14 14-20 18-12s-6 14 2 10 10-22 18-20-4 24 4 20 8-16 14-14 0 14 8 10 10-12 16-10 4 8 12 2 10-6 14-4" fill="none" stroke="#1d1b18" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+function toast(t,title){const el=document.createElement('div');el.className='toast';el.innerHTML=(title?`<b>${esc(title)}</b>`:'')+esc(t);document.getElementById('toasts').appendChild(el);setTimeout(()=>el.remove(),5500)}
+const fmtT=iso=>{const d=new Date(iso);return d.toLocaleString('ms-MY',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})};
+
+/* ===== Muat data ===== */
+async function load(){
+  const [profiles,claims,notif]=await Promise.all([api('profiles?select=*'),api('claims?select=*&order=id'),api('notifications?select=*&order=id.desc&limit=30')]);
+  S.profiles=profiles;S.claims=claims;S.me=profiles.find(p=>p.id===SES.uid);
+  const ids=claims.map(c=>c.id).join(',');
+  if(ids){const [rows,edits,logs]=await Promise.all([api(`claim_rows?select=*&claim_id=in.(${ids})&order=day`),api(`claim_edits?select=*&claim_id=in.(${ids})&order=id`),api(`claim_log?select=*&claim_id=in.(${ids})&order=id`)]);S.rows=rows;S.edits=edits;S.logs=logs}
+  else{S.rows=[];S.edits=[];S.logs=[]}
+  if(S.seenNotif!==null)notif.filter(n=>n.id>S.seenNotif).reverse().forEach(n=>toast(n.msg,'🔔 '+n.title));
+  S.seenNotif=notif.length?Math.max(...notif.map(n=>n.id)):0;S.notif=notif;
+}
+const claimOf=(uid,p=S.per)=>S.claims.find(c=>c.user_id===uid&&c.period===p);
+const rowsOf=c=>c?S.rows.filter(r=>r.claim_id===c.id).map(r=>({...r,of:r.of_})):[];
+const editsOf=(c,d)=>S.edits.filter(e=>e.claim_id===c.id&&e.day===d);
+const logsOf=c=>S.logs.filter(l=>l.claim_id===c.id);
+const leader=()=>S.me.role==='leader'?S.me:S.profiles.find(p=>p.id===S.me.leader_id)||{name:'-'};
+function totals(rows){let jam=0,shift=0,cto=0,hari=0;rows.forEach(r=>{if(r.wf){hari++;jam+=+r.jam||0;shift+=r.shift||0;cto+=r.cto||0}});return {hari,jam:Math.round(jam*100)/100,shift,cto}}
+
+/* ===== Borang (paparan Excel) ===== */
+const COLS=[['wf','Working Day From'],['wt','Working Day To'],['wn','Working Day Normal'],['wr','Working Day Rest Day'],['wp','Working Day Public Holiday'],['of','OT From'],['ot','OT To'],['on','OT Normal'],['or','OT Rest Day'],['op','OT Public Holiday'],['shift','Shift'],['meal','Meal'],['tr','Transport'],['cb','Call Back'],['sb','Standby'],['cto','CTO'],['cc','Control Centre'],['cp','Competency']];
+const EDITABLE=['desc','wf','wt','of','ot','on','op','shift','cto'];
+function cellVal(r,k){if(!r.wf)return '';const j=+r.jam;return {wf:r.wf,wt:r.wt,wn:r.ph?'':1,wr:'',wp:r.ph?1:'',of:r.of,ot:r.ot,on:r.ph?'':j,or:'',op:r.ph?j:'',shift:r.shift,meal:'',tr:'',cb:'',sb:'',cto:r.cto,cc:'',cp:''}[k]}
+function formView(m,c,interactive){
+  const rows=rowsOf(c);const can=interactive&&c.status==='sent';const ok=c.status==='ok'||c.status==='req';const T=totals(rows);
+  let wn=0,wp=0,on=0,op=0;rows.forEach(r=>{if(!r.wf)return;if(r.ph){wp++;op+=+r.jam}else{wn++;on+=+r.jam}});
+  let h=`<div class="formwrap"><div class="fm"><h2>APPLICATION FOR OVERTIME / ALLOWANCE</h2>
+  <div class="hd"><span>NAME</span><span>: ${esc(m.name)}</span><span>EMPLOYEE NO</span><span>: ${m.staff_no}</span><span>DEPOT/SECTOR/DEPARTMENT</span><span>: TRAIN OPS AMP LINE</span><span>GRADE</span><span>: JG 4</span><span>DESIGNATION</span><span>: TRANSIT OFFICER</span><span>MONTH</span><span>: NOVEMBER 2026</span><span>CONTACT NO</span><span>: 03 42891688 - 21125</span><span></span><span></span></div>
+  <table><thead><tr><th rowspan="2" class="y">DATE</th><th rowspan="2" class="y" style="width:150px">Please state working day, rest day, public holiday, annual leave, medical leave, reason for overtime, etc.</th><th colspan="5">WORKING DAY</th><th colspan="5">OVERTIME (HOURS)</th><th colspan="8">ALLOWANCE (RM)</th><th rowspan="2" class="ver">Supervisor's verification</th></tr>
+  <tr><th>From</th><th>To</th><th>Normal</th><th>Rest Day</th><th>Public Holiday</th><th>From</th><th>To</th><th>Normal</th><th>Rest Day</th><th>Public Holiday</th><th>SHIFT</th><th>MEAL</th><th>TRANSPORT</th><th>CALL BACK</th><th>STANDBY</th><th>CTO</th><th>CONTROL CENTRE</th><th>COMPETENCY</th></tr></thead><tbody>`;
+  for(const r of rows){
+    const fl=!!r.flag;const cc=can?' c':'';const eds=editsOf(c,r.day).filter(e=>e.by_role==='leader');
+    const cell=(k,v)=>{const fc=(fl&&r.flag_key===k?' fc':'')+(eds.some(e=>e.key===k)?' le':'');return `<td class="${cc}${fc}" data-cell="${r.day}|${k}">${esc(v)}</td>`};
+    h+=`<tr class="${fl?'fl':r.fixed_note?'fx':''}"><td>${r.day}</td>${cell('desc',r.descr).replace(esc(r.descr),esc(r.descr).replace(/\n/g,'<br>'))}${COLS.map(([k])=>cell(k,cellVal(r,k))).join('')}<td class="ver">${ok?SIG:fl?'<span class="vflag">⚑ Komen</span>':''}</td></tr>`;
+    if(can&&S.commenting&&S.commenting.d===r.day){const k=S.commenting.key;const editable=EDITABLE.includes(k);const cur=k==='desc'?r.descr:cellVal(r,k);
+      h+=`<tr class="cmrow"><td colspan="22"><b style="font-size:12.5px">${r.day}hb · ${esc(S.commenting.label)}</b> <span class="note">Nilai sekarang: <b>${esc(String(cur??'').replace(/\n/g,' ')||'(kosong)')}</b></span>
+      <div class="row" style="margin-top:6px"><input class="inp" id="cmIn" style="flex:1;min-width:220px" placeholder="Komen / sebab (cth: ikut punch card 1600)" value="${esc(S.draftCm)}"></div>
+      <div class="row" style="margin-top:6px">${editable?`<span style="font-size:12.5px;font-weight:600">Nilai betul:</span><input class="inp ${k==='desc'?'':'t'}" id="leVal" style="${k==='desc'?'flex:1;min-width:180px':''}" value="${esc(k==='desc'?r.descr:(cur??''))}"><button class="btn sm primary" data-act="leFix" data-d="${r.day}">✎ Betulkan sendiri</button><span class="note">atau</span>`:'<span class="note">Petak ini dikira sistem, hanya boleh minta user semak.</span>'}<button class="btn sm fix" data-act="cmSave" data-d="${r.day}">Minta user betulkan</button><button class="btn sm" data-act="cmCancel">Batal</button></div></td></tr>`;
+    }else{
+      eds.forEach(e=>{h+=`<tr class="leshow"><td colspan="22">✎ ${r.day}hb · ${esc(e.label)}: ${esc(e.from_val)} → <b>${esc(e.to_val)}</b> · diubah oleh leader${e.note?' · “'+esc(e.note)+'”':''}</td></tr>`});
+      if(fl)h+=`<tr class="cmshow"><td colspan="22"><div class="row">⚑ ${r.day}hb · ${esc(r.flag_col||'')}: ${esc(r.flag)}<span class="sp"></span>${can?`<button class="btn sm" data-act="unflag" data-d="${r.day}">Buang komen</button>`:''}</div></td></tr>`;
+    }
+  }
+  const lastOk=logsOf(c).filter(l=>l.msg.startsWith('Disahkan')).pop();
+  h+=`<tr><td colspan="2">TOTAL</td><td></td><td></td><td>${wn}</td><td></td><td>${wp||''}</td><td></td><td></td><td>${Math.round(on*100)/100}</td><td></td><td>${op||''}</td><td>${T.shift}</td><td></td><td></td><td></td><td></td><td>${T.cto}</td><td></td><td></td><td></td></tr></tbody></table>
+  <div class="ft"><div>Submitted by :<br><br>______________________<br>Date :</div><div>Certified by :<br><br>______________________<br>Immediate superior<br>Name : <b>${esc(leader().name)}</b><br>Date : ${ok&&lastOk?esc(fmtT(lastOk.created_at)):''}</div><div>Approved by :<br><br>______________________<br>Head of Division / Department<br>Name :<br>Date :</div></div></div></div>`;
+  return h;
+}
+function logBlock(c){const L=logsOf(c);return L.length?`<div style="margin-top:12px"><div class="muted" style="font-size:12px;font-weight:700">Sejarah</div><ul class="log">${L.map(l=>`<li>${esc(l.msg)}</li>`).join('')}</ul></div>`:''}
+
+/* ===== Paparan USER ===== */
+function userTable(c){
+  const rows=rowsOf(c);
+  return `<table><thead><tr><th>Hb</th><th>Keterangan</th><th class="num">Kerja</th><th class="num">OT</th><th class="num">Jam</th></tr></thead><tbody>${rows.map(r=>{
+    let extra='';
+    if(r.flag)extra+=`<div class="cm">⚑ ${r.flag_col?esc(r.flag_col)+': ':''}${esc(r.flag)}</div>`;
+    if(r.fixed_note)extra+=`<div class="cm okc">✓ ${esc(r.fixed_note)}</div>`;
+    editsOf(c,r.day).filter(e=>e.by_role==='leader').forEach(e=>{extra+=`<div class="cm lec">✎ Leader ubah ${esc(e.label)}: ${esc(e.from_val)} → ${esc(e.to_val)}${e.note?' (“'+esc(e.note)+'”)':''}</div>`});
+    const canEdit=r.wf&&(c.status==='draft'||c.status==='open'||(c.status==='fix'&&r.flag));
+    if(canEdit){
+      if(S.editing===r.day)extra+=`<div class="row" style="margin-top:4px"><span style="font-size:12px">OT</span><input class="inp t" id="uOf" value="${r.of}"><span>–</span><input class="inp t" id="uOt" value="${r.ot}"><button class="btn sm primary" data-act="uSave" data-d="${r.day}">Simpan</button><button class="btn sm" data-act="uCancel">Batal</button></div>`;
+      else extra+=`<div style="margin-top:4px"><button class="btn sm ${r.flag?'primary pulse':''}" data-act="uEdit" data-d="${r.day}">${r.flag?'Betulkan':'Ubah'}</button></div>`;
+    }
+    return `<tr class="${r.flag?'flag':r.fixed_note?'fixed':''}"><td class="num"><b>${r.day}</b></td><td>${esc(r.descr).replace(/\n/g,'<br>')}${extra}</td><td class="num">${r.wf?r.wf+'–'+r.wt:''}</td><td class="num">${r.wf?r.of+'–'+r.ot:''}</td><td class="num">${r.wf?+r.jam:''}</td></tr>`}).join('')}</tbody></table>`;
+}
+function renderUser(){
+  const c=claimOf(S.me.id);if(!c)return '<div class="card">Tiada claim untuk tempoh ini.</div>';
+  const rows=rowsOf(c);const T=totals(rows);const L=leader();const P=PERIODS[S.per];
+  let h=`<div class="card"><div class="row" style="margin-bottom:10px"><div><div class="muted" style="font-size:12px">Tab Claim · ${P.label}</div><div style="font-weight:800;font-size:16px">Status ${chip(c.status)}</div></div></div>
+  <div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><div class="v">${T.hari}</div><div class="l">Hari bekerja</div></div><div class="kpi"><div class="v">${T.jam}</div><div class="l">Jam OT</div></div><div class="kpi"><div class="v">RM${T.shift+T.cto}</div><div class="l">Elaun (shift + CTO)</div></div></div>`;
+  if(c.status==='draft')h+=`<div class="box">Semak claim anda. Tekan <b>Ubah</b> jika perlu. Bila betul, hantar kepada group leader <b>${esc(L.name)}</b>.</div><div class="row" style="margin-bottom:12px"><button class="btn primary" data-act="submit">Hantar ke leader</button></div>`;
+  else if(c.status==='sent')h+=`<div class="box">Claim sedang menunggu semakan <b>${esc(L.name)}</b>. Anda akan dapat notifikasi bila disemak.</div>`;
+  else if(c.status==='fix'){const n=rows.filter(r=>r.flag).length;h+=`<div class="box" style="border-color:var(--fix);color:var(--fix)"><b>Leader minta betulkan ${n} hari.</b> Hari bertanda merah di bawah.</div><div class="row" style="margin-bottom:12px"><button class="btn primary" data-act="submit" ${n?'disabled':''}>Hantar semula</button>${n?'<span class="note">Betulkan semua hari bertanda dahulu</span>':''}</div>`}
+  else if(c.status==='ok')h+=`<div class="box" style="border-color:var(--ok)"><b style="color:var(--ok)">🔒 Disahkan oleh ${esc(L.name)} dan dikunci.</b> Claim tidak boleh diubah tanpa kebenaran leader.<div class="row" style="margin-top:8px"><button class="btn sm" data-act="preview">Lihat borang Excel</button></div><div style="margin-top:10px;font-weight:600;font-size:12.5px">Perlu ubah sesuatu?</div><div class="row" style="margin-top:4px"><input class="inp" id="reqWhy" style="flex:1" placeholder="Sebab (cth: 14hb ada OT tambahan 1 jam)" value="${esc(S.reqWhy)}"><button class="btn sm primary" data-act="reqUnlock">Minta kebenaran ubah</button></div></div>`;
+  else if(c.status==='req')h+=`<div class="box" style="border-color:var(--warn)"><b style="color:var(--warn)">🔒 Permohonan ubah dihantar.</b> Menunggu kebenaran ${esc(L.name)}.<div class="note" style="margin-top:4px">Sebab: “${esc(c.req_reason)}”</div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="preview">Lihat borang Excel</button></div></div>`;
+  else if(c.status==='open')h+=`<div class="box" style="border-color:#7048e8"><b style="color:#7048e8">🔓 Leader benarkan anda ubah claim.</b> Tandatangan leader dibuang sehingga disahkan semula. Tekan <b>Ubah</b>, kemudian hantar semula.</div><div class="row" style="margin-bottom:12px"><button class="btn primary" data-act="submit">Hantar semula</button></div>`;
+  h+=userTable(c)+logBlock(c)+'</div>';
+  return h;
+}
+
+/* ===== Paparan LEADER ===== */
+function renderLeader(){
+  const members=S.profiles.filter(p=>p.leader_id===S.me.id).sort((a,b)=>a.staff_no.localeCompare(b.staff_no));const P=PERIODS[S.per];
+  if(S.open){
+    const m=members.find(x=>x.id===S.open);const c=claimOf(m.id);const rows=rowsOf(c);const T=totals(rows);const nf=rows.filter(r=>r.flag).length;
+    let h=`<div class="card"><div class="row" style="margin-bottom:10px"><button class="btn sm" data-act="back">← Senarai kumpulan</button><span class="sp"></span>${chip(c.status)}</div>
+    <div style="font-weight:800;font-size:16px">${esc(m.name)}</div><div class="muted" style="font-size:12.5px;margin-bottom:10px">${m.staff_no} · ${P.label} · ${T.hari} hari bekerja · ${T.jam} jam OT · RM${T.shift+T.cto}</div>`;
+    if(c.status==='sent')h+=`<div class="box">Ini borang Excel yang akan dihantar ke management. <b>Klik petak yang salah</b> untuk betulkan sendiri atau minta user betulkan.</div><div class="row actbar" style="margin-bottom:12px"><button class="btn fix" data-act="askFix" ${nf?'':'disabled'}>Minta betulkan (${nf})</button><button class="btn ok" data-act="approve" ${nf?'disabled':''}>Sahkan &amp; tandatangan</button></div>`;
+    else if(c.status==='fix')h+=`<div class="box" style="color:var(--fix)">Menunggu user membetulkan ${nf} hari.</div>`;
+    else if(c.status==='req')h+=`<div class="box" style="border-color:var(--warn)"><b style="color:var(--warn)">${esc(m.name)} minta kebenaran untuk ubah claim yang telah disahkan.</b><div style="margin-top:4px">Sebab: “${esc(c.req_reason)}”</div><div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="allow">🔓 Benarkan ubah</button><button class="btn sm" data-act="deny">Tolak</button><span class="note">Jika dibenarkan, tandatangan dibuang sehingga anda sahkan semula.</span></div></div>`;
+    else if(c.status==='open')h+=`<div class="box" style="border-color:#7048e8;color:#7048e8">🔓 Dibuka untuk diubah oleh user. Menunggu user hantar semula.</div>`;
+    else if(c.status==='ok')h+=`<div class="box" style="border-color:var(--ok)"><b style="color:var(--ok)">🔒 Telah disahkan dan dikunci.</b></div>`;
+    else h+=`<div class="box">User belum hantar claim. <button class="btn sm" data-act="remind" data-id="${m.id}">Hantar peringatan</button></div>`;
+    h+=formView(m,c,true)+logBlock(c)+'</div>';return h;
+  }
+  const cnt={draft:0,sent:0,fix:0,ok:0,req:0,open:0};members.forEach(m=>{const c=claimOf(m.id);if(c)cnt[c.status]++});
+  const order={req:0,sent:1,fix:2,open:3,draft:4,ok:5};
+  let h=`<div class="card"><div class="muted" style="font-size:12px;margin-bottom:8px">Kumpulan anda · ${P.label} · tarikh akhir ${P.due}</div>
+  <div class="kpis" style="grid-template-columns:repeat(5,1fr)">${[['draft','none',cnt.draft],['sent','wait',cnt.sent],['fix','fix',cnt.fix+cnt.open],['req','warn',cnt.req],['ok','ok',cnt.ok]].map(([k,col,v])=>`<div class="kpi"><div class="v" style="color:var(--${col})">${v}</div><div class="l">${k==='fix'?'Perlu betul / dibuka':STL[k][0]}</div></div>`).join('')}</div>`;
+  h+=members.slice().sort((a,b)=>order[(claimOf(a.id)||{}).status]-order[(claimOf(b.id)||{}).status]).map(m=>{const c=claimOf(m.id);const T=totals(rowsOf(c));const L=logsOf(c);const hi=c.status==='sent'||c.status==='req';
+    return `<div class="mem ${hi?'hi':''}" data-open="${m.id}"><div><div class="nm">${esc(m.name)}</div><div class="id">${m.staff_no} · ${T.jam} jam OT · ${L.length?esc(L[L.length-1].msg):'Belum ada tindakan'}</div></div><div class="row">${c.status==='draft'?`<button class="btn sm" data-act="remind" data-id="${m.id}">Ingatkan</button>`:''}${chip(c.status)}</div></div>`}).join('');
+  const nOk=cnt.ok+cnt.req;
+  h+=`<div class="box" style="margin-top:12px"><div class="row"><div class="sp"><b>Hantar ke management</b><div class="note">${nOk} daripada ${members.length} claim telah disahkan.</div></div><button class="btn primary" data-act="dlAll" ${nOk?'':'disabled'}>Muat turun semua (${nOk})</button></div></div>
+  <div class="row" style="margin-top:8px"><span class="sp"></span><button class="btn sm" data-act="resetDemo">↺ Tetapkan semula data demo</button></div></div>`;
+  return h;
+}
+
+/* ===== Render utama ===== */
+function renderLogin(err){
+  document.getElementById('app').innerHTML=`<div class="login card"><div class="badge">DEMO SEBENAR · SUPABASE · DATA REKAAN</div><h1 style="margin:6px 0 4px">Semakan Claim Leader</h1><div class="sub" style="margin-bottom:12px">Log masuk dengan ID pekerja demo.</div>
+  <label style="font-size:13px;font-weight:600">No. pekerja<br><input class="inp" id="lgId" inputmode="numeric" placeholder="cth 10090012"></label>
+  <label style="font-size:13px;font-weight:600;display:block;margin-top:8px">Kata laluan<br><input class="inp" id="lgPw" type="password" placeholder="Kata laluan"></label>
+  <button class="btn primary" style="width:100%;margin-top:12px" data-act="login">Log masuk</button>${err?`<div class="err">${esc(err)}</div>`:''}
+  <div class="note" style="margin-top:16px">Akaun demo (kata laluan semua: <b>Demo2026!</b>). Tekan untuk isi:</div>
+  ${DEMO_ACC.map(([id,n,r])=>`<div class="acc" data-fill="${id}"><span><b>${n}</b><br><span class="muted">${id}</span></span><span class="chip ${r==='Leader'?'s-sent':'s-draft'}">${r}</span></div>`).join('')}</div>`;
+}
+function render(){
+  if(!SES||!S.me){renderLogin();return}
+  const unread=S.notif.filter(n=>!n.read).length;
+  let h=`<div class="top"><div><div class="badge">DEMO SEBENAR · SUPABASE · DATA REKAAN</div><h1>${S.me.role==='leader'?'Semakan Claim Kumpulan':'Claim Saya'}</h1><div class="sub">${esc(S.me.name)} · ${S.me.staff_no} · ${S.me.role==='leader'?'Group Leader':'Transit Officer'} <span class="live"><i></i>langsung</span></div></div>
+  <div class="row" style="position:relative"><div class="seg">${Object.entries(PERIODS).map(([k,v])=>`<button data-per="${k}" class="${S.per===k?'on':''}">${v.label}</button>`).join('')}</div><button class="bell" data-act="bell">🔔<i ${unread?'':'hidden'}>${unread}</i></button><button class="btn sm" data-act="logout">Log keluar</button>
+  ${S.inbox?`<div class="inbox" style="top:44px">${S.notif.length?S.notif.map(n=>`<div><b>${esc(n.title)}</b><br>${esc(n.msg)}<small>${esc(fmtT(n.created_at))}</small></div>`).join(''):'<div class="muted">Tiada notifikasi</div>'}</div>`:''}</div></div>`;
+  h+=S.me.role==='leader'?renderLeader():renderUser();
+  document.getElementById('app').innerHTML=h;
+}
+async function refresh(){try{await load();render()}catch(e){if(e.message==='auth'){S.me=null;render()}}}
+async function act(fn){if(S.busy)return;S.busy=true;try{await fn();await load()}catch(e){if(e.message==='auth'){S.me=null}else toast(e.message,'Ralat')}S.busy=false;render()}
+
+document.addEventListener('click',e=>{
+  const fill=e.target.closest('[data-fill]');if(fill){document.getElementById('lgId').value=fill.dataset.fill;document.getElementById('lgPw').value='Demo2026!';return}
+  const cl=e.target.closest('td[data-cell].c');
+  if(cl&&!e.target.closest('[data-act]')){const [d,k]=cl.dataset.cell.split('|');const lab=k==='desc'?'Keterangan':(COLS.find(c=>c[0]===k)||[,''])[1];S.commenting={d:+d,key:k,label:lab};S.draftCm='';render();setTimeout(()=>{const i=document.getElementById('cmIn');if(i)i.focus()},0);return}
+  const t=e.target.closest('[data-act],[data-open],[data-per]');
+  if(!t){if(S.inbox){S.inbox=false;render()}return}
+  if(t.dataset.per){S.per=t.dataset.per;S.open=null;S.commenting=null;S.editing=null;render();return}
+  if(t.dataset.open&&!e.target.closest('[data-act]')){S.open=t.dataset.open;S.commenting=null;render();return}
+  const a=t.dataset.act,d=+t.dataset.d;const L=S.open?claimOf(S.open):null;const mine=S.me&&claimOf(S.me.id);
+  if(a==='login'){const id=document.getElementById('lgId').value.trim(),pw=document.getElementById('lgPw').value;
+    authToken({email:id+EMAIL_DOMAIN,password:pw},'password').then(()=>{S.seenNotif=null;return load()}).then(render).catch(err=>renderLogin(err.message==='Invalid login credentials'?'ID atau kata laluan salah':err.message));return}
+  if(a==='logout'){saveSes(null);S.me=null;S.open=null;render();return}
+  if(a==='bell'){S.inbox=!S.inbox;if(S.inbox&&S.notif.some(n=>!n.read))act(()=>rpc('mark_read'));else render();return}
+  if(a==='back'){S.open=null;S.commenting=null;render();return}
+  if(a==='cmCancel'){S.commenting=null;render();return}
+  if(a==='uEdit'){S.editing=d;render();return}
+  if(a==='uCancel'){S.editing=null;render();return}
+  if(a==='preview'){const m=S.me;document.getElementById('modal').innerHTML=`<div class="modal" data-act="bg"><div class="card" style="max-width:1240px"><div class="row" style="margin-bottom:8px"><b>Pratonton borang</b><span class="sp"></span><button class="btn sm" data-act="close">Tutup</button></div>${formView(m,mine,false)}</div></div>`;return}
+  if(a==='close'){document.getElementById('modal').innerHTML='';return}
+  if(a==='bg'){if(e.target===t)document.getElementById('modal').innerHTML='';return}
+  if(a==='dlAll'){const ms=S.profiles.filter(p=>p.leader_id===S.me.id&&['ok','req'].includes((claimOf(p.id)||{}).status));document.getElementById('modal').innerHTML=`<div class="modal" data-act="bg"><div class="card" style="max-width:520px"><b>Muat turun untuk management</b><p class="note">Dalam sistem penuh, satu fail ZIP dimuat turun dengan semua borang Excel bertandatangan:</p><ul style="font-size:13px">${ms.map(m=>`<li>Claim_OT_NOVEMBER_2026_${m.staff_no}_${S.per==='H1'?'1-15':'16-30'}.xlsx</li>`).join('')}</ul><div class="row"><span class="sp"></span><button class="btn primary" data-act="close">Selesai</button></div></div></div>`;return}
+  if(a==='submit')return act(()=>rpc('submit_claim',{cid:mine.id}));
+  if(a==='uSave'){const of=document.getElementById('uOf').value,ot=document.getElementById('uOt').value;S.editing=null;return act(()=>rpc('user_edit_row',{cid:mine.id,d,new_of:of,new_ot:ot}))}
+  if(a==='reqUnlock'){const v=(document.getElementById('reqWhy').value||'').trim();if(!v){toast('Sila tulis sebab dahulu');return}S.reqWhy='';return act(()=>rpc('request_unlock',{cid:mine.id,reason:v}))}
+  if(a==='cmSave'){const v=document.getElementById('cmIn').value;const cm=S.commenting;S.commenting=null;return act(()=>rpc('leader_flag',{cid:L.id,d,k:cm.key,col:cm.label,comment:v}))}
+  if(a==='leFix'){const v=document.getElementById('leVal').value,note=document.getElementById('cmIn').value.trim();const cm=S.commenting;S.commenting=null;return act(()=>rpc('leader_edit',{cid:L.id,d,k:cm.key,lab:cm.label,val:v,note}))}
+  if(a==='unflag')return act(()=>rpc('leader_unflag',{cid:L.id,d}));
+  if(a==='askFix')return act(async()=>{await rpc('ask_fix',{cid:L.id});S.open=null});
+  if(a==='approve')return act(async()=>{await rpc('approve_claim',{cid:L.id});S.open=null});
+  if(a==='allow'||a==='deny')return act(async()=>{await rpc('decide_unlock',{cid:L.id,allow:a==='allow'});S.open=null});
+  if(a==='remind')return act(async()=>{await rpc('remind_user',{uid:t.dataset.id});toast('Peringatan dihantar')});
+  if(a==='resetDemo'){if(t.dataset.sure!=='1'){t.dataset.sure='1';t.textContent='Tekan sekali lagi untuk sahkan';return}return act(async()=>{await rpc('reset_demo');S.open=null;toast('Data demo ditetapkan semula')})}
+});
+document.addEventListener('input',e=>{if(e.target.id==='cmIn')S.draftCm=e.target.value;if(e.target.id==='reqWhy')S.reqWhy=e.target.value});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='lgPw'||e.target.id==='lgId')){const b=document.querySelector('[data-act=login]');if(b)b.click()}});
+/* Kemas kini langsung: semak perubahan setiap 4 saat (dijeda semasa menaip) */
+setInterval(()=>{if(!SES||!S.me||S.busy||document.hidden)return;if(S.commenting||S.editing!==null||document.activeElement&&document.activeElement.tagName==='INPUT')return;refresh()},4000);
+if(SES)refresh();else render();
+</script>
+</body>
+</html>
