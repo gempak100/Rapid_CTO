@@ -107,6 +107,7 @@ const LS_KEY='jadual_kerja_state_v1';
 function normDuty(tokens){const t=tokens.map(x=>String(x).trim().toUpperCase().replace(/\s+/g,' ')).filter(Boolean);
   const isOT=x=>/^OT\s+\S/.test(x)||/\S\s+OT$/.test(x);const strip=x=>x.replace(/^OT\s+/,'').replace(/\s+OT$/,'');
   const main=t.filter(x=>!isOT(x)),ot=t.filter(isOT).map(strip);return main.length?[...main,...ot]:ot}
+function sldnBase(y,mo,d){const k=dkey(y,mo,d);const o=(S.sldnBase||{})[k];if(o)return o;const ch=S.changes[k];const src=ch&&ch.type==='SLDN'?ch.orig:((S.months[`${y}-${pad(mo)}`]||{})[d]||[]);const u=[].concat(src).join(' ').toUpperCase();return /\bREST\b/.test(u)?'REST':/\bOFF\b/.test(u)?'OFF':'work'}
 function dutyText(neu,y,m,d){try{const p=parseDay(neu);if(p.shifts.length<2)return neu.join(' / ');const it=p.shifts.map((c,i)=>{const sp=shiftSpan(c,y,m,d);return {t:(i?'OT ':'')+((p.labels&&p.labels[i])||c),st:sp?+sp[0]:i}});it.sort((a,b)=>a.st-b.st);return it.map(x=>x.t).join(' / ')}catch(e){return neu.join(' / ')}}
 function fixOTLabels(d){try{for(const mo of Object.values(d.months||{}))for(const k of Object.keys(mo)){const v=mo[k];if(Array.isArray(v)&&v.some(x=>/^OT\s+\S|\S\s+OT$/i.test(String(x).trim())))mo[k]=normDuty(v)}
   for(const c of Object.values(d.changes||{}))if(c&&Array.isArray(c.neu)&&c.neu.some(x=>/^OT\s+\S|\S\s+OT$/i.test(String(x).trim())))c.neu=normDuty(c.neu)}catch(e){}return d}
@@ -222,7 +223,7 @@ function dayCalc(k,d){
   const s0=spans.length?Math.min(...spans.map(x=>+x[0])):0,s1=spans.length?Math.max(...spans.map(x=>+x[1])):0;
   man.filter(m=>!(m.type==='cover'&&p.shifts.length>1)).forEach(m=>ot.push({kind:m.type==='ops'?(spans.length&&+m.en<=s0?'Ops Req (masuk awal)':spans.length&&+m.st>=s1?'Ops Req (balik lewat)':'Ops Requirement'):(MAN_KIND[m.type]||'OT tambahan'),mtype:m.type,st:m.st,en:m.en,h:m.h,note:m.note,i:m.i}));
   if(p.offOT){const sp=shiftSpan(p.offOT,y,mo,d);if(sp){p.offSpan=sp;if(!p.restOT)ot.push({kind:'OT dipanggil (OFF)',st:sp[0],en:sp[1],h:(sp[1]-sp[0])/3600000,note:p.offOT});}}
-  if(p.sldn&&!p.shifts.length){const sp=shiftSpan('SLDN',y,mo,d);if(sp)ot.push({kind:'SLDN',st:sp[0],en:sp[1],h:(sp[1]-sp[0])/3600000,note:'Keseluruhan duty dikira OT'});else missing.push('SLDN');}
+  if(p.sldn&&!p.shifts.length){p.sldnBase=sldnBase(y,mo,d);const sp=shiftSpan('SLDN',y,mo,d);if(sp)ot.push({kind:'SLDN',st:sp[0],en:sp[1],h:(sp[1]-sp[0])/3600000,note:'Keseluruhan duty dikira OT'});else missing.push('SLDN');}
   // Had sehari: OT maksimum 9 jam + 1 jam excess duty asal. OT sentiasa bersambung dengan duty asal: OT selepas duty asal dipotong di hujung, OT sebelum duty asal dipotong di awal
   { let left=OT_MAX; for(const o of ot){ if(o.kind==='1 jam shift'||o.mtype==='meal'||o.mtype==='cover'||o.mtype==='ops')continue; /* exceed sign off: dikira dalam had 9 jam */ /* ops req: permintaan management, boleh lebih 9 jam */ if(o.h>left){o.full=o.h;o.h=Math.max(0,left);} left-=o.h; }
     for(let i=ot.length-1;i>=0;i--) if(ot[i].h<=0&&!ot[i].full) ot.splice(i,1);
@@ -468,7 +469,7 @@ function renderCal(y,m){
     else if(r.off) inner=`<div class="code p-off">${esc(r.raw)}</div>`+(r.offOT?`<div class="code p-swap">☎ OT ${esc(r.offOT)}</div>`:'');
     else if(r.leave) inner=`<div class="code ${LEAVES.includes(r.leave)?'p-leave':'p-off'}">${r.leave}</div>`;
     else if(r.oh&&!r.shifts.length) inner=`<div class="code p-off">OH</div><div class="t">Office hour</div>`;
-    else if(r.sldn&&!r.shifts.length){const sp=r.ot.find(o=>o.kind==='SLDN');inner=`<div class="code p-pagi">SLDN</div>`+(sp?`<div class="t">${hhmm(sp.st,y,m,d)}–${hhmm(sp.en,y,m,d)} · OT ${fh(sp.h)} jam</div>`:'');}
+    else if(r.sldn&&!r.shifts.length){const sp=r.ot.find(o=>o.kind==='SLDN');inner=`<div class="code p-pagi">SLDN</div>`+(sp?`<div class="t">${hhmm(sp.st,y,m,d)}–${hhmm(sp.en,y,m,d)} · OT ${fh(sp.h)} jam${r.sldnBase==='REST'?' · Rest Day':''}</div>`:'');}
     else{
       /* OT dipanggil supervisor: ganti pil "X OT" dengan "☎ OT X" di atas; semua tanda OT diletak atas, sebelum masa */
       r.shifts.map((c,i)=>({c,i,st:r.spans[i]?+r.spans[i][0]:i})).sort((a,b)=>r.called?a.i-b.i:a.st-b.st).forEach(({c,i})=>{const lb=esc((r.labels&&r.labels[i])||c);if(r.called&&i>0)inner+=`<div class="code p-swap" title="Dipanggil supervisor">☎ OT ${lb}</div>`;else inner+=`<div class="code ${isPagi(c)?'p-pagi':'p-petang'}">${i>0?'OT ':''}${lb}</div>`});
@@ -620,6 +621,7 @@ function openDay(d){
   <b style="font-size:13px">Tukar shift / Cuti</b>${ch?`<div class="note">Roster asal: <b>${esc(ch.orig.join(' / ')||'-')}</b></div>`:''}
   <div class="seg" style="margin-top:6px">${[['none','Ikut roster'],['swap','Tukar shift'],['SLDN','SLDN'],['AL','AL'],['EL','EL'],['CL','CL'],['MC','MC']].map(([v,l])=>`<label><input type="radio" name="chg" value="${v}" ${(ch?ch.type:'none')===v?'checked':''}>${l}</label>`).join('')}</div>
   <div id="chSwap" style="margin-top:8px;display:${ch&&ch.type==='swap'?'block':'none'}">${swapUI(ch,d)}</div>
+  <div id="chSldn" style="margin-top:8px;display:${ch&&ch.type==='SLDN'?'block':'none'}">${(()=>{const b=sldnBase(y,m,d);return `<div class="note" style="margin-bottom:4px">Hari asal (tentukan lajur OT dalam borang): REST → Rest Day, lain-lain → Normal</div><div class="seg">${[['work','Hari kerja'],['REST','REST'],['OFF','OFF']].map(([v,l])=>`<label><input type="radio" name="sldnB" value="${v}" ${b===v?'checked':''}>${l}</label>`).join('')}</div>`})()}</div>
   <div id="chNote" style="margin-top:8px;display:${ch&&ch.type!=='none'?'block':'none'}"><input id="chN" placeholder="Catatan (sebab / no. rujukan)" value="${esc(ch&&ch.note||'')}" style="width:100%"></div></div>
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:${r.shifts.length?'block':'none'}"><b style="font-size:13px">☎ OT dipanggil supervisor</b>
   <div class="row" style="margin-top:6px"><select id="odSel"><option value="">Tiada</option>${Object.keys(S.times).sort((a,b)=>(isPagi(a)===isPagi(b)?a.localeCompare(b):isPagi(a)?-1:1)).map(c=>`<option value="${esc(c)}" ${S.otDuty[ck]===c?'selected':''}>${esc(c)} (${tSpan(S.times[c])})</option>`).join('')}</select>
@@ -642,7 +644,7 @@ function openDay(d){
   bindSwap(md);
   const ctoTouched=false; /* kotak Tuntut CTO dibuang: CTO ikut hari kerja sahaja */
   ['#exS','#exE'].forEach(q=>{const el=md.querySelector(q);if(el)el.addEventListener('input',()=>{el.dataset.touched='1'})});
-  md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
+  md.querySelectorAll('input[name=chg]').forEach(i=>i.onchange=()=>{const v=i.value;md.querySelector('#chSwap').style.display=v==='swap'?'block':'none';md.querySelector('#chSldn').style.display=v==='SLDN'?'block':'none';md.querySelector('#chNote').style.display=v==='none'?'none':'block';});
   md.addEventListener('click',e=>{if(e.target===md||e.target.id==='dx')md.remove();
     const dot=e.target.closest('[data-delot]');if(dot){const a=S.otManual[ck]||[];a.splice(+dot.dataset.delot,1);if(!a.length)delete S.otManual[ck];md.remove();render();save('OT dibuang');return}
     const del=e.target.closest('[data-delev]');if(del){const k=dkey(y,m,d);S.events=S.events.filter(x=>!(x.date===k&&x.title===del.dataset.delev));md.remove();render();save('Event dibuang')}});
@@ -657,6 +659,8 @@ function openDay(d){
       if(typ==='swap'&&!neu.length){toast('Isi shift baru dulu');return}
       S.changes[ck]={type:typ,orig,neu,with:typ==='swap'?md.querySelector('#swWith').value.trim():'',note:md.querySelector('#chN').value.trim(),at:Date.now()};
       v=neu;
+      S.sldnBase=S.sldnBase||{};delete S.sldnBase[ck];
+      if(typ==='SLDN'){const sel=md.querySelector('input[name=sldnB]:checked');const auto=sldnBase(y,m,d);if(sel&&sel.value!==auto)S.sldnBase[ck]=sel.value;}
     }
     S.months[cur]=S.months[cur]||{};if(v.length)S.months[cur][d]=v;else delete S.months[cur][d];
     S.cto[cur]=S.cto[cur]||{};
@@ -761,8 +765,8 @@ function formRows(k){
       const segs=[];r.ot.forEach(o=>{const pv=segs[segs.length-1];if(pv&&+pv.en===+o.st&&o.mtype==='ops'&&/lewat/.test(o.kind))pv.en=o.en; /* Ex Sign Off: baris sendiri dari duty habis (cth A1 1400-1430) */else segs.push({st:o.st,en:o.en});});
       if(r.ot.length){segs.sort((a,b)=>+a.st-+b.st); /* baris OT ikut urutan masa */c.H=segs.map(o=>T4(o.st)).join('\n');c.I=segs.map(o=>T4(o.en)).join('\n');if(r.holiday)c.L=+fh(r.otTot);else c.J=+fh(r.otTot);}
     }else if(r.sldn&&r.ot.length){
-      lines.push('SLDN');if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
-      const so=r.ot.slice().sort((a,b)=>+a.st-+b.st);c.H=so.map(o=>T4(o.st)).join('\n');c.I=so.map(o=>T4(o.en)).join('\n');if(r.holiday)c.L=+fh(r.otTot);else c.J=+fh(r.otTot);
+      lines.push(r.sldnBase==='REST'?'REST/SLDN':r.sldnBase==='OFF'?'OFF/SLDN':'SLDN');if(r.holiday)lines.push(`*PH ${r.holiday.replace(/\*$/,'').toUpperCase()}`);
+      const so=r.ot.slice().sort((a,b)=>+a.st-+b.st);c.H=so.map(o=>T4(o.st)).join('\n');c.I=so.map(o=>T4(o.en)).join('\n');if(r.holiday)c.L=+fh(r.otTot);else if(r.sldnBase==='REST')c.K=+fh(r.otTot);else c.J=+fh(r.otTot);
     }else if(r.off&&r.offOT){
       lines.push(`${r.raw}/OT ${r.offOT}`);
       man.forEach(o=>{const l=manLine(o);if(!lines.includes(l))lines.push(l)});
@@ -1176,7 +1180,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-25.2';
+const APP_VERSION='2026-11-25.3';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
