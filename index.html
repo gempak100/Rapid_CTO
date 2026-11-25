@@ -107,7 +107,7 @@ const LS_KEY='jadual_kerja_state_v1';
 function normDuty(tokens){const t=tokens.map(x=>String(x).trim().toUpperCase().replace(/\s+/g,' ')).filter(Boolean);
   const isOT=x=>/^OT\s+\S/.test(x)||/\S\s+OT$/.test(x);const strip=x=>x.replace(/^OT\s+/,'').replace(/\s+OT$/,'');
   const main=t.filter(x=>!isOT(x)),ot=t.filter(isOT).map(strip);return main.length?[...main,...ot]:ot}
-function sldnBase(y,mo,d){const k=dkey(y,mo,d);const o=(S.sldnBase||{})[k];if(o)return o;const ch=S.changes[k];const src=ch&&ch.type==='SLDN'?ch.orig:((S.months[`${y}-${pad(mo)}`]||{})[d]||[]);const u=[].concat(src).join(' ').toUpperCase();return /\bREST\b/.test(u)?'REST':/\bOFF\b/.test(u)?'OFF':'work'}
+function sldnBase(y,mo,d){const k=dkey(y,mo,d);const o=(S.sldnBase||{})[k];if(o)return o;const ch=S.changes[k];const src=ch&&ch.type==='SLDN'?ch.orig:((S.months[`${y}-${mo}`]||{})[d]||[]);const u=[].concat(src).join(' ').toUpperCase();return /\bREST\b/.test(u)?'REST':/\bOFF\b/.test(u)?'OFF':'work'}
 function dutyText(neu,y,m,d){try{const p=parseDay(neu);if(p.shifts.length<2)return neu.join(' / ');const it=p.shifts.map((c,i)=>{const sp=shiftSpan(c,y,m,d);return {t:(i?'OT ':'')+((p.labels&&p.labels[i])||c),st:sp?+sp[0]:i}});it.sort((a,b)=>a.st-b.st);return it.map(x=>x.t).join(' / ')}catch(e){return neu.join(' / ')}}
 function fixOTLabels(d){try{for(const mo of Object.values(d.months||{}))for(const k of Object.keys(mo)){const v=mo[k];if(Array.isArray(v)&&v.some(x=>/^OT\s+\S|\S\s+OT$/i.test(String(x).trim())))mo[k]=normDuty(v)}
   for(const c of Object.values(d.changes||{}))if(c&&Array.isArray(c.neu)&&c.neu.some(x=>/^OT\s+\S|\S\s+OT$/i.test(String(x).trim())))c.neu=normDuty(c.neu)}catch(e){}return d}
@@ -654,7 +654,11 @@ function openDay(d){
     let v=md.querySelector('#dv').value.split('/').map(s=>s.trim().toUpperCase()).filter(Boolean);
     const typ=md.querySelector('input[name=chg]:checked').value;
     const orig=ch?ch.orig:v;
-    if(typ==='none'){ if(ch){ v=(md.querySelector('#dv').value.trim()===ch.neu.join(' / '))?ch.orig:v; delete S.changes[ck]; } }
+    if(typ==='none'){ if(ch){ v=(md.querySelector('#dv').value.trim()===ch.neu.join(' / '))?ch.orig:v; delete S.changes[ck]; }
+      /* Kod shift ditaip terus di kotak atas: rekod sebagai tukar shift supaya tak ditimpa roster semasa kemas kini */
+      const rosterVal=ch?ch.orig:JSON.parse(prevSlots);
+      if(v.length&&JSON.stringify(v)!==JSON.stringify(rosterVal)){v=normDuty(v);S.changes[ck]={type:'swap',orig:rosterVal,neu:v,with:'',note:'',at:Date.now()};}
+    }
     else{
       const neu = typ==='swap' ? normDuty(md.querySelector('#swNew').value.split('/')) : [typ];
       if(typ==='swap'&&!neu.length){toast('Isi shift baru dulu');return}
@@ -1200,7 +1204,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-25.5';
+const APP_VERSION='2026-11-26.1';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
