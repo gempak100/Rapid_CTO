@@ -550,6 +550,7 @@ function leaveUsed(y){
 function chMsg(k,c){
   const [y,m,d]=k.split('-').map(Number);const dt=`${HARI[new Date(y,m-1,d).getDay()]}, ${d} ${BULAN[m-1]} ${y}`;
   if(c.type==='swap') return `Salam Tuan/Puan, saya ${S.name} (${S.staffNo}) ingin memohon tukar shift pada ${dt}: shift asal ${c.orig.join('/')||'-'} ditukar kepada ${c.neu.join('/')}${c.with?` dengan ${c.with}`:''}.${c.note?' Sebab: '+c.note+'.':''} Terima kasih.`;
+  if(c.type==='OH') return `Salam Tuan/Puan, saya ${S.name} (${S.staffNo}) dimaklumkan bertugas Office Hour (OH) pada ${dt}, menggantikan shift asal ${c.orig.join('/')||'-'}.${c.note?' Catatan: '+c.note+'.':''} Terima kasih.`;
   if(c.type==='SLDN') return `Salam Tuan/Puan, saya ${S.name} (${S.staffNo}) dimaklumkan bertugas SLDN (0900–1800) pada ${dt}, menggantikan shift asal ${c.orig.join('/')||'-'}.${c.note?' Catatan: '+c.note+'.':''} Terima kasih.`;
   return `Salam Tuan/Puan, saya ${S.name} (${S.staffNo}) ingin memohon ${LEAVE_NAME[c.type]} (${c.type}) pada ${dt} (shift asal ${c.orig.join('/')||'-'}).${c.note?' Sebab: '+c.note+'.':''} Terima kasih.`;
 }
@@ -557,12 +558,12 @@ let ctab='swap'; // sub-tab: 'swap' (Tukar Shift) atau 'leave' (Cuti)
 function renderCuti(){
   const y=+cur.split('-')[0];const used=leaveUsed(y);
   const all=Object.entries(S.changes).filter(([k])=>+k.split('-')[0]===y).sort((a,b)=>a[0]<b[0]?-1:1);
-  const swaps=all.filter(([k,c])=>c.type==='swap'||c.type==='SLDN'),leaves=all.filter(([k,c])=>c.type!=='swap'&&c.type!=='SLDN');
+  const NOTLV=['swap','SLDN','OH'];const swaps=all.filter(([k,c])=>NOTLV.includes(c.type)),leaves=all.filter(([k,c])=>!NOTLV.includes(c.type));
   const [cy,cm]=cur.split('-').map(Number);const mSw=swaps.filter(([k])=>+k.split('-')[1]===cm);
   let h=`<div class="row" style="gap:6px;margin-bottom:12px"><button class="btn ${ctab==='swap'?'primary':''}" style="flex:1" data-ctab="swap">⇄ Tukar Shift</button><button class="btn ${ctab==='leave'?'primary':''}" style="flex:1" data-ctab="leave">Cuti</button></div>`;
   h+=ctab==='swap'?`<div class="monthbar"><button class="btn" data-mnav="-1">‹</button><h2>${BULAN[cm-1]} ${cy}</h2><button class="btn" data-mnav="1">›</button></div>`:`<div class="monthbar"><button class="btn" data-ynav="-1">‹</button><h2>Tahun ${y}</h2><button class="btn" data-ynav="1">›</button></div>`;
   const item=([k,c])=>{const [yy,mm,dd]=k.split('-').map(Number);
-    return `<div class="item"><span><span class="pill ${c.type==='swap'||c.type==='SLDN'?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.type==='swap'?dutyText(c.neu,yy,mm,dd):c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`};
+    return `<div class="item"><span><span class="pill ${['swap','SLDN','OH'].includes(c.type)?'p-swap':'p-leave'}">${c.type==='swap'?'⇄ Tukar':c.type}</span> ${dd} ${BULAN[mm-1].slice(0,3)} (${HARI[new Date(yy,mm-1,dd).getDay()]}) · ${esc(c.orig.join(' / ')||'-')} → <b>${esc(c.type==='swap'?dutyText(c.neu,yy,mm,dd):c.neu.join(' / '))}</b>${c.with?' · dengan '+esc(c.with):''}${c.note?`<div class="note">${esc(c.note)}</div>`:''}</span><span class="row" style="flex-wrap:nowrap"><button class="btn" style="padding:4px 9px" data-msg="${k}">Salin mesej</button><button class="btn" style="padding:4px 9px" data-undo="${k}">Batal</button></span></div>`};
   if(ctab==='swap'){
     h+=`<div class="card"><b>Tukar shift ${BULAN[cm-1]} (${mSw.length})</b><p class="note">Untuk tambah, tekan hari dalam Kalendar dan pilih Tukar shift.</p><div class="list">${mSw.length?mSw.map(item).join(''):'<div class="note" style="padding:10px 0">Tiada tukar shift bulan ni.</div>'}</div></div>`;
   }else{
@@ -619,7 +620,7 @@ function openDay(d){
   <input id="dv" value="${esc(slots.join(' / '))}" style="width:100%">
   <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
   <b style="font-size:13px">Tukar shift / Cuti</b>${ch?`<div class="note">Roster asal: <b>${esc(ch.orig.join(' / ')||'-')}</b></div>`:''}
-  <div class="seg" style="margin-top:6px">${[['none','Ikut roster'],['swap','Tukar shift'],['SLDN','SLDN'],['AL','AL'],['EL','EL'],['CL','CL'],['MC','MC']].map(([v,l])=>`<label><input type="radio" name="chg" value="${v}" ${(ch?ch.type:'none')===v?'checked':''}>${l}</label>`).join('')}</div>
+  <div class="seg" style="margin-top:6px">${[['none','Ikut roster'],['swap','Tukar shift'],['SLDN','SLDN'],['OH','OH'],['AL','AL'],['EL','EL'],['CL','CL'],['MC','MC']].map(([v,l])=>`<label><input type="radio" name="chg" value="${v}" ${(ch?ch.type:'none')===v?'checked':''}>${l}</label>`).join('')}</div>
   <div id="chSwap" style="margin-top:8px;display:${ch&&ch.type==='swap'?'block':'none'}">${swapUI(ch,d)}</div>
   <div id="chSldn" style="margin-top:8px;display:${ch&&ch.type==='SLDN'?'block':'none'}">${(()=>{const b=sldnBase(y,m,d);return `<div class="note" style="margin-bottom:4px">Hari asal (tentukan lajur OT dalam borang): REST → Rest Day, lain-lain → Normal</div><div class="seg">${[['work','Hari kerja'],['REST','REST'],['OFF','OFF']].map(([v,l])=>`<label><input type="radio" name="sldnB" value="${v}" ${b===v?'checked':''}>${l}</label>`).join('')}</div>`})()}</div>
   <div id="chNote" style="margin-top:8px;display:${ch&&ch.type!=='none'?'block':'none'}"><input id="chN" placeholder="Catatan (sebab / no. rujukan)" value="${esc(ch&&ch.note||'')}" style="width:100%"></div></div>
@@ -1180,7 +1181,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-25.3';
+const APP_VERSION='2026-11-25.4';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
