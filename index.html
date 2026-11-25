@@ -863,29 +863,45 @@ a+=`<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>2</xdr:col><xdr:colOf
 const BULAN_EN=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 window.__buildClaimForm=buildClaimForm;
 /* Semakan sebelum cetak: tunjuk amaran dulu, user boleh betulkan atau cetak juga */
-function printChecks(){
-  const [y,m]=cur.split('-').map(Number);const n=monthDays(cur);const mo=S.months[cur]||{};const F=S.form||{};
+function printChecks(part){
+  const [y,m]=cur.split('-').map(Number);const n=monthDays(cur);const d1=part==='back'?16:1,d2=part==='front'?15:n;const mo=S.months[cur]||{};const F=S.form||{};
   const {rows,T}=monthCalc(cur);const OTLIM=+S.otLimit||105;const W=[];const bl=BULAN[m-1].slice(0,3);
   const rng=a=>{const out=[];let i=0;while(i<a.length){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;out.push(j>i?`${a[i]}–${a[j]}`:`${a[i]}`);i=j+1}return out.join(', ')};
   if(!String(F.grade||'').trim())W.push({t:'Grade belum diisi',d:'Ruangan Grade dalam borang akan kosong.',fix:'tetapan'});
   if(!String(F.superior||'').trim())W.push({t:'Nama immediate superior belum diisi',d:'Bahagian Certified by akan kosong.',fix:'tetapan'});
-  const blank=[];for(let d=1;d<=n;d++)if(!mo[d]&&!S.otManual[dkey(y,m,d)])blank.push(d);
+  const blank=[];for(let d=d1;d<=d2;d++)if(!mo[d]&&!S.otManual[dkey(y,m,d)])blank.push(d);
   if(blank.length)W.push({t:`Tiada roster: ${rng(blank)} ${bl}`,d:'Baris hari ini akan kosong dalam borang.'});
   const miss=[...new Set(rows.flatMap(r=>r.missing))];
   if(miss.length)W.push({t:`Waktu shift belum diisi: ${miss.join(', ')}`,d:'Jam OT untuk shift ini tak dapat dikira.'});
   const ot=Math.round(T.otTot*100)/100;if(ot>OTLIM)W.push({t:`Jumlah OT ${fh(ot)} jam melebihi had ${fh(OTLIM)} jam`,d:'Semak semula sebelum hantar kepada leader.'});
-  const td=new Date();td.setHours(0,0,0,0);const fut=[];for(let d=1;d<=n;d++){if(new Date(y,m-1,d)>td&&mo[d])fut.push(d)}
+  const td=new Date();td.setHours(0,0,0,0);const fut=[];for(let d=d1;d<=d2;d++){if(new Date(y,m-1,d)>td&&mo[d])fut.push(d)}
   if(fut.length)W.push({t:`Hari belum berlaku: ${rng(fut)} ${bl}`,d:'Claim untuk hari ini dikira ikut roster. Pastikan tiada perubahan sebelum hantar.'});
+  if(part==='back'){const pf=(S.printedFront||{})[cur];if(pf&&pf.h!==frontHash())W.unshift({t:`Hari 1–15 berubah selepas muka depan dicetak (${new Date(pf.at).toLocaleDateString('ms-MY')})`,d:'Muka depan yang dah disemak leader tak sama lagi dengan data. Cetak semula kedua-dua muka (Penuh).'});
+    else if(!pf)W.push({t:'Muka depan (1–15) belum dicetak dari apps ini',d:'Pastikan kertas yang dimasukkan ialah muka depan yang betul.'});}
   return W;
 }
+function frontHash(){try{const R=formRows(cur).rows;const o={};for(let d=1;d<=15;d++)if(R[d])o[d]=R[d];return JSON.stringify(o)}catch(e){return ''}}
 function dlForm(kind){
-  kind=kind||'pdf';const W=printChecks();if(!W.length)return doDlForm(kind);
+  kind=kind||'pdf';if(kind!=='pdf')return dlCheck(kind,'full');
+  const [y,m]=cur.split('-').map(Number);const n=monthDays(cur);const bl=BULAN[m-1];const pf=(S.printedFront||{})[cur];
+  const md=document.createElement('div');md.className='modal';
+  md.innerHTML=`<div class="card"><b>Cetak Tugasan Harian · ${bl} ${y}</b><p class="note">Pilih bahagian yang hendak dicetak (A4 landskap).</p>
+  <div class="list">
+   <button class="btn" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-part="full"><b>Penuh (1–${n} ${bl.slice(0,3)})</b><div class="note">Dua muka, depan & belakang. Untuk hujung bulan.</div></button>
+   <button class="btn" style="display:block;width:100%;text-align:left;margin-bottom:6px" data-part="front"><b>Muka depan sahaja (1–15)</b><div class="note">Untuk semakan leader separuh bulan.</div></button>
+   <button class="btn" style="display:block;width:100%;text-align:left" data-part="back"><b>Muka belakang sahaja (16–${n})</b><div class="note">Masukkan semula kertas yang sama, muka bercetak mengikut arah printer anda. ${pf?'Muka depan dicetak '+new Date(pf.at).toLocaleDateString('ms-MY')+'.':''}</div></button>
+  </div><div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn" id="ptX">Batal</button></div></div>`;
+  document.body.appendChild(md);
+  md.addEventListener('click',e=>{const b=e.target.closest('[data-part]');if(b){md.remove();dlCheck(kind,b.dataset.part)}else if(e.target===md||e.target.id==='ptX')md.remove()});
+}
+function dlCheck(kind,part){
+  const W=printChecks(part);if(!W.length)return doDlForm(kind,part);
   const md=document.createElement('div');md.className='modal';const fixT=W.some(w=>w.fix==='tetapan');
   md.innerHTML=`<div class="card"><b>Semak sebelum cetak</b><p class="note">Ada ${W.length} perkara yang perlu diberi perhatian:</p>
   <div class="list">${W.map(w=>`<div class="item" style="display:block"><b style="text-transform:none">⚠ ${esc(w.t)}</b><div class="note">${esc(w.d)}</div></div>`).join('')}</div>
   <div class="row" style="margin-top:14px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" id="pcX">Batal</button>${fixT?'<button class="btn" id="pcF">Betulkan di Tetapan</button>':''}<button class="btn primary" id="pcG">Cetak juga</button></div></div>`;
   document.body.appendChild(md);
-  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='pcX')md.remove();else if(e.target.id==='pcF'){md.remove();view='tetapan';render()}else if(e.target.id==='pcG'){md.remove();doDlForm(kind)}});
+  md.addEventListener('click',e=>{if(e.target===md||e.target.id==='pcX')md.remove();else if(e.target.id==='pcF'){md.remove();view='tetapan';render()}else if(e.target.id==='pcG'){md.remove();doDlForm(kind,part)}});
 }
 /* ===== PDF: lukis borang terus dari Excel yang dijana (A4 landskap, depan 1–15, belakang 16–31) ===== */
 const IDXC=['000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','800000','008000','000080','808000','800080','008080','C0C0C0','808080','9999FF','993366','FFFFCC','CCFFFF','660066','FF8080','0066CC','CCCCFF','000080','FF00FF','FFFF00','00FFFF','800080','800000','008080','0000FF','00CCFF','CCFFFF','CCFFCC','FFFF99','99CCFF','FF99CC','CC99FF','FFCC99','3366FF','33CCCC','99CC00','FFCC00','FF9900','FF6600','666699','969696','003366','339966','003300','333300','993300','993366','333399','333333'];
@@ -927,7 +943,7 @@ function runW(ctx,r){const k=setF(ctx,r.f);return ctx.measureText(r.t).width*k}
 function drawRun(ctx,r,x,y){const k=setF(ctx,r.f);if(k!==1){ctx.save();ctx.translate(x,y);ctx.scale(k,1);ctx.fillText(r.t,0,0);ctx.restore()}else ctx.fillText(r.t,x,y);return ctx.measureText(r.t).width*k}
 function fmtNum(v,nf){const n=+v;if(!isFinite(n))return String(v);if(nf===2||nf===4)return n.toFixed(2);if(nf===167)return n.toFixed(1);if(nf===1||nf===3)return String(Math.round(n));return String(Math.round(n*1e9)/1e9)}
 
-async function claimPdf(xlsx){
+async function claimPdf(xlsx,only){
   const P=await unzipParts(xlsx);const td=new TextDecoder();const T=n=>P[n]?td.decode(P[n]):'';
   const thx=T('xl/theme/theme1.xml');const cl=k=>{const m=thx.match(new RegExp('<a:'+k+'>[\\s\\S]*?(?:lastClr|val)="([0-9A-Fa-f]{6})"'));return m?m[1]:'000000'};
   const theme=[cl('lt1'),cl('dk1'),cl('lt2'),cl('dk2'),cl('accent1'),cl('accent2'),cl('accent3'),cl('accent4'),cl('accent5'),cl('accent6'),cl('hlink'),cl('folHlink')];
@@ -983,7 +999,8 @@ async function claimPdf(xlsx){
   const PW=land?842:595,PH=land?595:842;const hc=/horizontalCentered="1"/.test(sh),vc=/verticalCentered="1"/.test(sh);
   const colX={};let acc=0;for(let c=c1;c<=c2+1;c++){colX[c]=acc;acc+=colW(c)}const totW=colX[c2+1];
   const DPI=200,K=DPI/72;const out=[];
-  for(const rows of pages){
+  for(const [pi,rows] of pages.entries()){
+    if(only!=null&&pi!==only)continue;
     const cv=document.createElement('canvas');cv.width=Math.round(PW*K);cv.height=Math.round(PH*K);const ctx=cv.getContext('2d');
     ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.scale(K,K);ctx.textBaseline='alphabetic';
     const rowY={};let y=0;for(const r of rows){rowY[r]=y;y+=rowH(r)}const totH=y;
@@ -1057,14 +1074,16 @@ function makePdf(pages,PW,PH){
   put(x);put(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xo}\n%%EOF\n`);
   const out=new Uint8Array(off);let q=0;for(const c of chunks){out.set(c,q);q+=c.length}return out;
 }
-async function doDlForm(kind){
+async function doDlForm(kind,part){
+  part=part||'full';
   if(!cap.downloads){toast('Muat turun tak tersedia di paparan ni');return}
   const [y,m]=cur.split('-').map(Number);const base=`Claim_OT_${BULAN_EN[m-1]}_${y}_${shortId(S.staffNo)?10000000+ +shortId(S.staffNo):S.staffNo}`;
   try{
     const xl=buildClaimForm(cur);
     if(kind==='xlsx'){await cap.downloads.save({filename:base+'.xlsx',data:xl});return}
-    toast('Menyediakan PDF…');const pdf=await claimPdf(xl);
-    await cap.downloads.save({filename:base+'.pdf',data:pdf});
+    toast('Menyediakan PDF…');const pdf=await claimPdf(xl,part==='front'?0:part==='back'?1:null);
+    await cap.downloads.save({filename:base+(part==='front'?'_1-15':part==='back'?'_16-'+monthDays(cur):'')+'.pdf',data:pdf});
+    if(part!=='back'){S.printedFront=S.printedFront||{};S.printedFront[cur]={h:frontHash(),at:Date.now()};save('PDF disediakan');}
   }catch(e){if(e&&e.code==='declined')return;console.error(e);toast('Tak dapat sediakan fail: '+((e&&(e.code||e.message))||'ralat'))}
 }
 
@@ -1181,7 +1200,7 @@ root.addEventListener('click',e=>{
 render();
 setInterval(()=>{if(view==='kalendar')render()},60000);
 /* Kemas kini automatik untuk apps yang dipasang (PWA): semak versi baru bila apps dibuka / kembali ke depan */
-const APP_VERSION='2026-11-25.4';
+const APP_VERSION='2026-11-25.5';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(reg=>{try{reg.update()}catch(e){}}).catch(()=>{}); }
 let _updShown=false,_lastChk=0;
 async function checkUpdate(manual){
